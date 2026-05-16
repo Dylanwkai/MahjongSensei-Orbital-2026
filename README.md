@@ -8,9 +8,16 @@ Mahjong has a steep learning curve and is notoriously hard to pick up. Most peop
 
 **Core Features:**  
   1. SoloPlay
-  3. Rules & Points Guide
-  4. Hand Helper
-  5. Interactive Trainer
+      A fully playable single-player mode where users compete against a computer-controlled opponent. The computer player uses the valuation algorithm to make decisions, giving users a realistic game environment to apply what they have learned across the other three features.
+
+  2. Rules & Points Guide
+     A structured, module-based tutorial system where users progress through visual lessons covering tile recognition, meld types, winning hand compositions, and the full points scoring system — with interactive quizzes and worked examples at each stage to reinforce understanding.
+     
+  3. Hand Helper
+     A hand analysis tool where users input their current 13-tile hand via a visual tile picker, and the system evaluates all possible discards using a valuation algorithm to recommend the optimal move — displaying the reasoning and win probability behind each suggestion.
+     
+  4. Interactive Trainer
+     A practice mode that procedurally generates Mahjong hands and challenges users to identify the best move. The system scores the user's decision in real time using the same valuation algorithm as the Hand Helper, providing immediate feedback on what the correct move was and why.
 
 
 User Stories:
