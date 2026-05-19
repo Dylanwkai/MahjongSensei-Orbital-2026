@@ -19,6 +19,16 @@ Mahjong has a steep learning curve and is notoriously hard to pick up. Most peop
   4. Interactive Trainer:
      A practice mode that procedurally generates Mahjong hands and challenges users to identify the best move. The system scores the user's decision in real time using the same valuation algorithm as the Hand Helper, providing immediate feedback on what the correct move was and why.
 
+     *Extensions:*
+       1. Stats Tracker:
+            A dashboard to display each user's lifetime statistics, including date of account creation, number of games played, number of games won etc.
+       2. Hand Sorter:
+            To be implemented in every playable mode, where user can automatically arrange tiles in the hands numerically and by suit. Optionally lets the user manually arrange tiles
+       5. a
+       6. 
+            
+
+
 
 User Stories:
 
