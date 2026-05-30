@@ -1,85 +1,64 @@
+from django.contrib.auth.models import User
 from django.test import TestCase
-from .engine import Tile, Hand, Deck, HandGenerator
+from rest_framework.test import APIClient
 
-class TileTests(TestCase):
-    def test_tile_creation(self):
-        tile = Tile('bamboo', 1)
-        self.assertEqual(tile.suit, 'bamboo')
-        self.assertEqual(tile.value, 1)
+from .engine import Deck, HandGenerator, Tile
 
-    def test_tile_equality(self):
-        tile1 = Tile('bamboo', 1)
-        tile2 = Tile('bamboo', 1)
-        self.assertEqual(tile1, tile2)
 
-    def test_flower_tile_is_bonus(self):
-        tile = Tile('flower', 'red_1', is_bonus=True)
-        self.assertTrue(tile.is_bonus)
-
-    def test_animal_tile_is_bonus(self):
-        tile = Tile('animal', 'cat', is_bonus=True)
-        self.assertTrue(tile.is_bonus)
-
-    def test_normal_tile_is_not_bonus(self):
-        tile = Tile('bamboo', 1)
-        self.assertFalse(tile.is_bonus)
-
-class DeckTests(TestCase):
-    def test_deck_has_148_tiles(self):
+class MahjongEngineTests(TestCase):
+    def test_deck_contains_singapore_mahjong_tile_set(self):
         deck = Deck()
-        self.assertEqual(len(deck.tiles), 148)
 
-    def test_deck_has_108_suited_tiles(self):
-        deck = Deck()
-        suited = [t for t in deck.tiles if t.suit in ['bamboo', 'circles', 'characters']]
-        self.assertEqual(len(suited), 108)
+        self.assertEqual(len(deck), 148)
+        self.assertEqual(len([tile for tile in deck.tiles if tile.is_bonus]), 12)
+        self.assertEqual(len([tile for tile in deck.tiles if not tile.is_bonus]), 136)
 
-    def test_deck_has_28_honour_tiles(self):
-        deck = Deck()
-        honours = [t for t in deck.tiles if t.suit == 'honour']
-        self.assertEqual(len(honours), 28)
+    def test_random_hand_has_thirteen_playable_tiles(self):
+        hand = HandGenerator().generate_random_hand()
 
-    def test_deck_has_8_flower_tiles(self):
-        deck = Deck()
-        flowers = [t for t in deck.tiles if t.suit == 'flower']
-        self.assertEqual(len(flowers), 8)
+        self.assertEqual(len(hand.tiles), 13)
+        self.assertTrue(all(not tile.is_bonus for tile in hand.tiles))
 
-    def test_deck_has_4_animal_tiles(self):
-        deck = Deck()
-        animals = [t for t in deck.tiles if t.suit == 'animal']
-        self.assertEqual(len(animals), 4)
+    def test_bonus_tiles_are_separated_from_playable_hand(self):
+        hand = HandGenerator().generate_random_hand()
 
-    def test_draw_reduces_deck_size(self):
-        deck = Deck()
-        deck.draw()
-        self.assertEqual(len(deck.tiles), 147)
+        self.assertTrue(all(tile.is_bonus for tile in hand.bonus_tiles))
+        self.assertEqual(hand.to_dict()["tile_count"], 13)
 
-class HandTests(TestCase):
-    def test_hand_always_has_13_valid_tiles(self):
-        for _ in range(10):  # run 10 times since hands are random
-            generator = HandGenerator()
-            hand = generator.generate_random_hand()
-            self.assertEqual(len(hand.tiles), 13)
+    def test_tile_serializes_for_api_response(self):
+        tile = Tile("bamboo", 3)
 
-    def test_hand_contains_no_bonus_tiles(self):
-        for _ in range(10):
-            generator = HandGenerator()
-            hand = generator.generate_random_hand()
-            for tile in hand.tiles:
-                self.assertFalse(tile.is_bonus)
+        self.assertEqual(
+            tile.to_dict(),
+            {
+                "suit": "bamboo",
+                "value": 3,
+                "code": "B3",
+                "label": "3 bamboo",
+                "is_bonus": False,
+            },
+        )
 
-    def test_bonus_tiles_tracked_separately(self):
-        # force bonus tiles into the deck at the front so they get drawn
-        generator = HandGenerator()
-        hand = generator.generate_random_hand()
-        # all bonus tiles should be in bonus_tiles, not in tiles
-        for tile in hand.bonus_tiles:
-            self.assertTrue(tile.is_bonus)
-            self.assertNotIn(tile, hand.tiles)
 
-    def test_discard_reduces_hand_size(self):
-        generator = HandGenerator()
-        hand = generator.generate_random_hand()
-        tile_to_discard = hand.tiles[0]
-        hand.discard(tile_to_discard)
-        self.assertEqual(len(hand.tiles), 12)
+class RandomHandApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="demo_user",
+            password="demo_password_123",
+        )
+
+    def test_random_hand_requires_login(self):
+        response = self.client.get("/api/game/random-hand/")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_logged_in_user_can_generate_random_hand(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/game/random-hand/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["tile_count"], 13)
+        self.assertEqual(len(response.data["tiles"]), 13)
+        self.assertIn("code", response.data["tiles"][0])

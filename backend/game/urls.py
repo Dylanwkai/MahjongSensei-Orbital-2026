@@ -1,5 +1,7 @@
 from django.urls import path
 
+from .views import RandomHandView
+
 urlpatterns = [
-    # game URLs will go here later
+    path('random-hand/', RandomHandView.as_view(), name='random-hand'),
 ]

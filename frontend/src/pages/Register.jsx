@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 
 function Register() {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
-    const { register } = useAuth()
+    const { isAuthenticated, register } = useAuth()
     const navigate = useNavigate()
+
+    if (isAuthenticated) {
+        return <Navigate to="/home" replace />
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -20,29 +24,33 @@ function Register() {
     }
 
     return (
-        <div>
-            <h2>Register</h2>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <div>
-                    <label>Username</label>
+        <div className="auth-page">
+            <section className="auth-card">
+                <p className="eyebrow">MahjongSensei</p>
+                <h2>Register</h2>
+                {error && <p className="error-message">{error}</p>}
+                <form className="auth-form" onSubmit={handleSubmit}>
+                    <label htmlFor="register-username">Username</label>
                     <input
+                        id="register-username"
                         type="text"
                         value={username}
+                        autoComplete="username"
                         onChange={(e) => setUsername(e.target.value)}
                     />
-                </div>
-                <div>
-                    <label>Password</label>
+
+                    <label htmlFor="register-password">Password</label>
                     <input
+                        id="register-password"
                         type="password"
                         value={password}
+                        autoComplete="new-password"
                         onChange={(e) => setPassword(e.target.value)}
                     />
-                </div>
-                <button type="submit">Register</button>
-            </form>
-            <p>Already have an account? <a href="/login">Login</a></p>
+                    <button className="primary-button" type="submit">Register</button>
+                </form>
+                <p>Already have an account? <Link to="/login">Login</Link></p>
+            </section>
         </div>
     )
 }

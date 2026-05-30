@@ -14,7 +14,18 @@ class UserSerializer(serializers.ModelSerializer):
         return user
     
 class ProfileSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+
     class Meta:
         model = Profile
-        fields = ['id', 'user', 'games_played', 'games_won', 'win_rate', 'created_at']
-        read_only_fields = ['user', 'created_at']
+        fields = [
+            'id',
+            'user_id',
+            'username',
+            'games_played',
+            'games_won',
+            'win_rate',
+            'created_at',
+        ]
+        read_only_fields = ['user_id', 'username', 'created_at']
