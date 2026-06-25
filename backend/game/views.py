@@ -13,6 +13,7 @@ from .engine import (
     HandGenerator,
     Tile,
     ValuationAlgorithm,
+    WinChecker,
 )
 from .models import Move, Session
 
@@ -79,6 +80,49 @@ class RecommendDiscardView(APIView):
         recommendation = ValuationAlgorithm().recommend_discard(hand)
 
         return Response(recommendation)
+
+
+class CheckWinView(APIView):
+    """POST /api/game/check-win/
+
+    Body: { "tiles": [ {suit, value}, ... ] } with exactly 14 playable tiles.
+    Returns whether the hand is already a complete winning hand and, if so,
+    which pattern (standard / seven_pairs / thirteen_orphans).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        tile_data = request.data.get("tiles", [])
+
+        if not isinstance(tile_data, list):
+            return Response(
+                {"error": "tiles must be a list."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(tile_data) != 14:
+            return Response(
+                {"error": "A winning hand must contain exactly 14 playable tiles."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            tiles = [parse_tile(tile) for tile in tile_data]
+        except (AttributeError, ValueError) as error:
+            return Response(
+                {"error": str(error)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tile_counts = Counter((tile.suit, tile.value) for tile in tiles)
+        if any(count > 4 for count in tile_counts.values()):
+            return Response(
+                {"error": "A hand cannot contain more than 4 copies of the same tile."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(WinChecker().check(tiles))
 
 
 # ---------------------------------------------------------------------------

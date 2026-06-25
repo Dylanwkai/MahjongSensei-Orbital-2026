@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
 
@@ -65,6 +65,7 @@ function HandHelper() {
     const [recommendation, setRecommendation] = useState(null)
     const [error, setError] = useState('')
     const [isLoading, setIsLoading] = useState(false)
+    const [winResult, setWinResult] = useState(null)
 
     const tileOptions = useMemo(() => {
         const suitedTiles = NUMBERED_SUITS.flatMap(({ suit, code }) => (
@@ -127,6 +128,37 @@ function HandHelper() {
             setIsLoading(false)
         }
     }
+
+    // Whenever a full 14-tile hand is selected, automatically ask the backend
+    // whether it is already a complete winning hand. Below 14 tiles there is
+    // nothing to check, so the banner is cleared.
+    useEffect(() => {
+        if (selectedTiles.length !== 14) {
+            setWinResult(null)
+            return
+        }
+
+        let cancelled = false
+        const checkWin = async () => {
+            try {
+                const response = await api.post('/api/game/check-win/', {
+                    tiles: selectedTiles.map(({ suit, value }) => ({ suit, value })),
+                })
+                if (!cancelled) {
+                    setWinResult(response.data)
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setWinResult(null)
+                }
+            }
+        }
+
+        checkWin()
+        return () => {
+            cancelled = true
+        }
+    }, [selectedTiles])
 
     return (
         <AppLayout>
@@ -221,6 +253,25 @@ function HandHelper() {
                         <div className="empty-state">
                             <p>Select tiles from the picker to build your hand.</p>
                         </div>
+                    )}
+
+                    {winResult?.is_winning && (
+                        <section
+                            className="recommendation-panel"
+                            aria-label="Winning hand"
+                            style={{
+                                borderColor: '#22c55e',
+                                background: 'rgba(34, 197, 94, 0.12)',
+                                marginTop: '1rem',
+                            }}
+                        >
+                            <p className="eyebrow">🎉 Winning hand!</p>
+                            <h3>{winResult.description}</h3>
+                            <p>
+                                This hand is already complete — no discard needed. You can
+                                still ask for a recommendation below to explore alternatives.
+                            </p>
+                        </section>
                     )}
 
                     <div className="helper-actions">

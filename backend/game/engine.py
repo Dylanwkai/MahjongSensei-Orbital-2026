@@ -262,3 +262,116 @@ class ValuationAlgorithm:
                 "combination of sets, pairs, and near-sequences."
             ),
         }
+
+
+# Thirteen Orphans needs one of every terminal (1 & 9 in each numbered suit)
+# plus all seven honour tiles — 13 distinct tiles, one of them duplicated.
+ORPHAN_TILES = frozenset(
+    [(suit, value) for suit in NUMBERED_SUITS for value in (1, 9)]
+    + [("honour", honour) for honour in HONOUR_VALUES]
+)
+
+_SUIT_ORDER = {"characters": 0, "bamboo": 1, "circles": 2, "honour": 3}
+_HONOUR_ORDER = {honour: index for index, honour in enumerate(HONOUR_VALUES)}
+
+PATTERN_LABELS = {
+    "standard": "Standard hand — four melds and a pair",
+    "seven_pairs": "Seven Pairs",
+    "thirteen_orphans": "Thirteen Orphans",
+}
+
+
+class WinChecker:
+    """Detects whether a 14-tile hand is a complete (winning) hand.
+
+    Recognizes three winning shapes:
+      * standard         - four melds (Pong / Chow) plus one pair
+      * seven_pairs      - seven distinct pairs
+      * thirteen_orphans - one of every terminal and honour, plus a duplicate
+
+    Bonus tiles (flowers / animals) are ignored, and exactly 14 playable tiles
+    are required. Kongs are not counted here because a 14-tile hand that uses a
+    Kong would need a replacement tile (15 tiles) to be complete.
+    """
+
+    def check(self, tiles):
+        playable = [tile for tile in tiles if not tile.is_bonus]
+        if len(playable) != 14:
+            return self._result(False, None)
+
+        counts = Counter((tile.suit, tile.value) for tile in playable)
+
+        if self._is_thirteen_orphans(counts):
+            return self._result(True, "thirteen_orphans")
+        if self._is_seven_pairs(counts):
+            return self._result(True, "seven_pairs")
+        if self._is_standard(counts):
+            return self._result(True, "standard")
+        return self._result(False, None)
+
+    # ----- winning shapes -------------------------------------------------
+    def _is_seven_pairs(self, counts):
+        return len(counts) == 7 and all(count == 2 for count in counts.values())
+
+    def _is_thirteen_orphans(self, counts):
+        if set(counts.keys()) != ORPHAN_TILES:
+            return False
+        return sorted(counts.values()) == [1] * 12 + [2]
+
+    def _is_standard(self, counts):
+        # Try every possible pair (the "eyes"), then check whether the rest
+        # decompose into four melds.
+        for key, count in counts.items():
+            if count >= 2:
+                trial = self._subtract(counts, [key, key])
+                if self._can_form_melds(trial):
+                    return True
+        return False
+
+    def _can_form_melds(self, counts):
+        if not counts:
+            return True
+
+        # Resolve a deterministic "smallest" tile each step.
+        key = min(counts.keys(), key=self._tile_order)
+        suit, value = key
+        count = counts[key]
+
+        # Option 1: use it as a Pong (three identical tiles).
+        if count >= 3:
+            if self._can_form_melds(self._subtract(counts, [key, key, key])):
+                return True
+
+        # Option 2: use it as the start of a Chow (numbered suits only).
+        if suit in NUMBERED_SUITS and isinstance(value, int) and value <= 7:
+            run = [(suit, value), (suit, value + 1), (suit, value + 2)]
+            if all(counts.get(part, 0) >= 1 for part in run):
+                if self._can_form_melds(self._subtract(counts, run)):
+                    return True
+
+        return False
+
+    # ----- helpers --------------------------------------------------------
+    @staticmethod
+    def _subtract(counts, keys):
+        reduced = dict(counts)
+        for key in keys:
+            reduced[key] -= 1
+            if reduced[key] == 0:
+                del reduced[key]
+        return reduced
+
+    @staticmethod
+    def _tile_order(key):
+        suit, value = key
+        if isinstance(value, int):
+            return (_SUIT_ORDER.get(suit, 9), value)
+        return (_SUIT_ORDER.get(suit, 9), 100 + _HONOUR_ORDER.get(value, 0))
+
+    @staticmethod
+    def _result(is_winning, pattern):
+        return {
+            "is_winning": is_winning,
+            "pattern": pattern,
+            "description": PATTERN_LABELS.get(pattern, "Not a winning hand yet"),
+        }

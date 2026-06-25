@@ -2,8 +2,25 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .engine import Deck, Hand, HandEvaluator, HandGenerator, Tile, ValuationAlgorithm
+from .engine import (
+    Deck,
+    Hand,
+    HandEvaluator,
+    HandGenerator,
+    Tile,
+    ValuationAlgorithm,
+    WinChecker,
+)
 from .models import Move, Session
+
+
+def tiles(*specs):
+    """Helper: tiles('B', 1, 'B', 2, ...) -> list of Tile objects."""
+    suit_map = {"B": "bamboo", "C": "circles", "K": "characters", "H": "honour"}
+    out = []
+    for index in range(0, len(specs), 2):
+        out.append(Tile(suit_map[specs[index]], specs[index + 1]))
+    return out
 
 
 class MahjongEngineTests(TestCase):
@@ -344,3 +361,167 @@ class TrainerApiTests(TestCase):
         self.assertEqual(response.data["total_attempts"], 2)
         self.assertIn("accuracy", response.data)
         self.assertEqual(len(response.data["attempts"]), 2)
+
+
+class WinCheckerTests(TestCase):
+    def setUp(self):
+        self.checker = WinChecker()
+
+    def test_standard_win_with_chows_pongs_and_pair(self):
+        # 234B chow, 666C pong, 789K chow, East pong, Red pair = 14 tiles.
+        hand = tiles(
+            "B", 2, "B", 3, "B", 4,
+            "C", 6, "C", 6, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "H", "east", "H", "east", "H", "east",
+            "H", "red", "H", "red",
+        )
+        result = self.checker.check(hand)
+        self.assertTrue(result["is_winning"])
+        self.assertEqual(result["pattern"], "standard")
+
+    def test_standard_win_all_chows(self):
+        # 123B 123B 456C 789K + 5C pair.
+        hand = tiles(
+            "B", 1, "B", 2, "B", 3,
+            "B", 1, "B", 2, "B", 3,
+            "C", 4, "C", 5, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "C", 9, "C", 9,
+        )
+        result = self.checker.check(hand)
+        self.assertTrue(result["is_winning"])
+        self.assertEqual(result["pattern"], "standard")
+
+    def test_seven_pairs(self):
+        hand = tiles(
+            "B", 1, "B", 1,
+            "B", 5, "B", 5,
+            "C", 2, "C", 2,
+            "C", 9, "C", 9,
+            "K", 3, "K", 3,
+            "K", 7, "K", 7,
+            "H", "white", "H", "white",
+        )
+        result = self.checker.check(hand)
+        self.assertTrue(result["is_winning"])
+        self.assertEqual(result["pattern"], "seven_pairs")
+
+    def test_thirteen_orphans(self):
+        # One of every terminal + honour, with East duplicated.
+        hand = tiles(
+            "B", 1, "B", 9,
+            "C", 1, "C", 9,
+            "K", 1, "K", 9,
+            "H", "east", "H", "south", "H", "west", "H", "north",
+            "H", "red", "H", "green", "H", "white",
+            "H", "east",
+        )
+        result = self.checker.check(hand)
+        self.assertTrue(result["is_winning"])
+        self.assertEqual(result["pattern"], "thirteen_orphans")
+
+    def test_incomplete_hand_is_not_a_win(self):
+        # A close-but-not-complete hand (no valid pair + four melds).
+        hand = tiles(
+            "B", 1, "B", 2, "B", 4,
+            "C", 6, "C", 6, "C", 7,
+            "K", 7, "K", 8, "K", 9,
+            "H", "east", "H", "south", "H", "west",
+            "H", "red", "H", "green",
+        )
+        result = self.checker.check(hand)
+        self.assertFalse(result["is_winning"])
+        self.assertIsNone(result["pattern"])
+
+    def test_wrong_tile_count_is_not_a_win(self):
+        hand = tiles("B", 1, "B", 1)
+        self.assertFalse(self.checker.check(hand)["is_winning"])
+
+    def test_honours_cannot_form_a_chow(self):
+        # East-South-West is not a meld; this hand should not be a standard win.
+        hand = tiles(
+            "H", "east", "H", "south", "H", "west",
+            "B", 1, "B", 2, "B", 3,
+            "C", 4, "C", 5, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "B", 5, "B", 5,
+        )
+        result = self.checker.check(hand)
+        self.assertFalse(result["is_winning"])
+
+
+class CheckWinApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="win_user",
+            password="win_password_123",
+        )
+        self.winning_payload = {
+            "tiles": [
+                {"suit": "bamboo", "value": 2},
+                {"suit": "bamboo", "value": 3},
+                {"suit": "bamboo", "value": 4},
+                {"suit": "circles", "value": 6},
+                {"suit": "circles", "value": 6},
+                {"suit": "circles", "value": 6},
+                {"suit": "characters", "value": 7},
+                {"suit": "characters", "value": 8},
+                {"suit": "characters", "value": 9},
+                {"suit": "honour", "value": "east"},
+                {"suit": "honour", "value": "east"},
+                {"suit": "honour", "value": "east"},
+                {"suit": "honour", "value": "red"},
+                {"suit": "honour", "value": "red"},
+            ]
+        }
+
+    def test_check_win_requires_login(self):
+        response = self.client.post(
+            "/api/game/check-win/", self.winning_payload, format="json"
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_check_win_detects_winning_hand(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/game/check-win/", self.winning_payload, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_winning"])
+        self.assertEqual(response.data["pattern"], "standard")
+
+    def test_check_win_detects_non_winning_hand(self):
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "tiles": [
+                {"suit": "bamboo", "value": 1},
+                {"suit": "bamboo", "value": 2},
+                {"suit": "bamboo", "value": 4},
+                {"suit": "circles", "value": 6},
+                {"suit": "circles", "value": 6},
+                {"suit": "circles", "value": 7},
+                {"suit": "characters", "value": 7},
+                {"suit": "characters", "value": 8},
+                {"suit": "characters", "value": 9},
+                {"suit": "honour", "value": "east"},
+                {"suit": "honour", "value": "south"},
+                {"suit": "honour", "value": "west"},
+                {"suit": "honour", "value": "red"},
+                {"suit": "honour", "value": "green"},
+            ]
+        }
+        response = self.client.post("/api/game/check-win/", payload, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["is_winning"])
+        self.assertIsNone(response.data["pattern"])
+
+    def test_check_win_rejects_wrong_tile_count(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/game/check-win/",
+            {"tiles": [{"suit": "bamboo", "value": 1}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)

@@ -1,18 +1,498 @@
+import { useEffect, useMemo, useState } from 'react'
+import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
+import TileCard, { makeTile } from '../components/TileCard'
+import MeldDemo from '../components/MeldDemo'
+import Quiz from '../components/Quiz'
 
-// PLACEHOLDER — owned by Person B (Interactive Tutorial System, Feature 1).
-// Routing (/tutorial in App.jsx) and the nav link (AppLayout.jsx) are already
-// wired, so Person B only needs to replace the contents of this file and add
-// any new components under src/components/. See PERSON_B_PROMPT.md.
+// ---------------------------------------------------------------------------
+// Client-side lesson content, keyed by the module ids served from the backend
+// (tiles, melds, winning-hands). The backend stores completion + scores,
+// actual teaching content lives here so it is easy to extend.
+// ---------------------------------------------------------------------------
+
+const LESSON_CONTENT = {
+    tiles: {
+        lessons: [
+            {
+                title: 'The three numbered suits',
+                body:
+                    'Most of the wall is made of three suits numbered 1 to 9: Bamboo, Circles, and Characters. There are four copies of every tile.',
+                tiles: [
+                    makeTile('bamboo', 1),
+                    makeTile('bamboo', 5),
+                    makeTile('circles', 3),
+                    makeTile('circles', 9),
+                    makeTile('characters', 2),
+                    makeTile('characters', 7),
+                ],
+            },
+            {
+                title: 'Honour tiles',
+                body:
+                    'Honour tiles have no number. The four winds are East, South, West, and North; the three dragons are Red, Green, and White.',
+                tiles: [
+                    makeTile('honour', 'east'),
+                    makeTile('honour', 'south'),
+                    makeTile('honour', 'west'),
+                    makeTile('honour', 'north'),
+                    makeTile('honour', 'red'),
+                    makeTile('honour', 'green'),
+                    makeTile('honour', 'white'),
+                ],
+            },
+            {
+                title: 'Bonus tiles: flowers and animals',
+                body:
+                    'Flowers and animals are bonus tiles unique to Singaporean Mahjong. They are set aside for points and immediately replaced, never forming part of your playing hand.',
+                tiles: [
+                    makeTile('flower', 'red_1'),
+                    makeTile('flower', 'blue_1'),
+                    makeTile('animal', 'cat'),
+                    makeTile('animal', 'mouse'),
+                ],
+            },
+        ],
+        quiz: [
+            {
+                prompt: 'Which of these is an honour tile?',
+                options: ['5 Bamboo', 'Green Dragon', '3 Circles', '9 Characters'],
+                answer: 1,
+            },
+            {
+                prompt: 'How many copies of each numbered tile are in the wall?',
+                options: ['1', '2', '4', '9'],
+                answer: 2,
+            },
+            {
+                prompt: 'What happens to a flower or animal tile when you draw it?',
+                options: [
+                    'It stays in your hand as a normal tile',
+                    'It is discarded immediately',
+                    'It is set aside for bonus points and replaced',
+                    'It ends the game',
+                ],
+                answer: 2,
+            },
+        ],
+    },
+    melds: {
+        lessons: [
+            {
+                title: 'Pong — three identical tiles',
+                meld: {
+                    name: 'Pong',
+                    tiles: [makeTile('circles', 5), makeTile('circles', 5), makeTile('circles', 5)],
+                    description: 'Three of exactly the same tile.',
+                },
+            },
+            {
+                title: 'Kong — four identical tiles',
+                meld: {
+                    name: 'Kong',
+                    tiles: [
+                        makeTile('characters', 8),
+                        makeTile('characters', 8),
+                        makeTile('characters', 8),
+                        makeTile('characters', 8),
+                    ],
+                    description: 'Four of the same tile. You draw a replacement after declaring it.',
+                },
+            },
+            {
+                title: 'Chow — a run of three',
+                meld: {
+                    name: 'Chow',
+                    tiles: [makeTile('bamboo', 3), makeTile('bamboo', 4), makeTile('bamboo', 5)],
+                    description: 'Three consecutive numbers in the same suit. Honours can never form a Chow.',
+                },
+            },
+        ],
+        quiz: [
+            {
+                prompt: 'A Pong is made of…',
+                options: [
+                    'Three consecutive tiles in a suit',
+                    'Three identical tiles',
+                    'Four identical tiles',
+                    'A pair plus one',
+                ],
+                answer: 1,
+            },
+            {
+                prompt: 'Which meld has four tiles?',
+                options: ['Pong', 'Chow', 'Kong', 'Pair'],
+                answer: 2,
+            },
+            {
+                prompt: 'Which set is a valid Chow?',
+                options: [
+                    '3-4-5 Bamboo',
+                    '5-5-5 Circles',
+                    'East-South-West',
+                    '2-4-6 Characters',
+                ],
+                answer: 0,
+            },
+        ],
+    },
+    'winning-hands': {
+        lessons: [
+            {
+                title: 'The shape of a winning hand',
+                body:
+                    'A standard winning hand is four melds (Pongs, Kongs, or Chows) plus one pair — the "eyes". That is 14 tiles when you draw the winning tile.',
+            },
+            {
+                title: 'A worked example',
+                body:
+                    'Here is a complete hand: a Chow, a Pong, a Chow, a Pong, and a pair of dragons.',
+                groups: [
+                    [makeTile('bamboo', 2), makeTile('bamboo', 3), makeTile('bamboo', 4)],
+                    [makeTile('circles', 6), makeTile('circles', 6), makeTile('circles', 6)],
+                    [makeTile('characters', 7), makeTile('characters', 8), makeTile('characters', 9)],
+                    [makeTile('honour', 'east'), makeTile('honour', 'east'), makeTile('honour', 'east')],
+                    [makeTile('honour', 'red'), makeTile('honour', 'red')],
+                ],
+            },
+            {
+                title: 'The pair',
+                body:
+                    'Every standard hand needs exactly one pair: two identical tiles. Without the pair you are not yet a winning hand, no matter how many melds you hold.',
+                tiles: [makeTile('honour', 'red'), makeTile('honour', 'red')],
+            },
+        ],
+        quiz: [
+            {
+                prompt: 'A standard winning hand is made of…',
+                options: [
+                    'Five melds',
+                    'Four melds and a pair',
+                    'Three Pongs and two Chows',
+                    'Seven pairs only',
+                ],
+                answer: 1,
+            },
+            {
+                prompt: 'How many tiles are in a complete standard hand (including the winning tile)?',
+                options: ['13', '14', '16', '17'],
+                answer: 1,
+            },
+            {
+                prompt: 'What is the "pair" in a winning hand?',
+                options: [
+                    'Two consecutive tiles',
+                    'Two identical tiles',
+                    'Any two honour tiles',
+                    'Two bonus tiles',
+                ],
+                answer: 1,
+            },
+        ],
+    },
+}
+
+function LessonView({ lesson }) {
+    return (
+        <div className="lesson-view">
+            <h3>{lesson.title}</h3>
+            {lesson.body && <p>{lesson.body}</p>}
+
+            {lesson.meld && (
+                <MeldDemo
+                    name={lesson.meld.name}
+                    tiles={lesson.meld.tiles}
+                    description={lesson.meld.description}
+                />
+            )}
+
+            {lesson.tiles && (
+                <ul className="tile-grid">
+                    {lesson.tiles.map((tile, index) => (
+                        <li key={`${tile.code}-${index}`} className={`tile tile-${tile.suit}`}>
+                            <span className="tile-code">{tile.code}</span>
+                            <span className="tile-label">{tile.label}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {lesson.groups && (
+                <div
+                    className="meld-group-row"
+                    style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.75rem' }}
+                >
+                    {lesson.groups.map((group, gi) => (
+                        <div
+                            key={gi}
+                            className="meld-tile-row"
+                            style={{ display: 'flex', gap: '0.35rem' }}
+                        >
+                            {group.map((tile, ti) => (
+                                <TileCard key={`${tile.code}-${ti}`} tile={tile} />
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
 function Tutorial() {
+    const [modules, setModules] = useState([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState('')
+
+    const [activeId, setActiveId] = useState(null)
+    const [step, setStep] = useState(0) // index into [lessons..., quiz]
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [saveError, setSaveError] = useState('')
+
+    const fetchModules = async () => {
+        try {
+            const response = await api.get('/api/tutorial/modules/')
+            setModules(response.data)
+            setError('')
+        } catch (err) {
+            setError('Could not load tutorial modules. Please log in again and retry.')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchModules()
+    }, [])
+
+    const activeModule = useMemo(
+        () => modules.find((m) => m.id === activeId) || null,
+        [modules, activeId]
+    )
+    const content = activeId ? LESSON_CONTENT[activeId] : null
+    const lessons = content?.lessons || []
+    const totalSteps = lessons.length + 1 // lessons + quiz step
+    const completedCount = modules.filter((m) => m.completed).length
+
+    const openModule = (id) => {
+        setActiveId(id)
+        setStep(0)
+        setSaveError('')
+    }
+
+    const backToList = () => {
+        setActiveId(null)
+        setStep(0)
+        setSaveError('')
+    }
+
+    const handleQuizComplete = async (score) => {
+        setIsSubmitting(true)
+        setSaveError('')
+        try {
+            await api.post('/api/tutorial/complete/', {
+                module_id: activeId,
+                quiz_score: score,
+            })
+            await fetchModules() // reflect saved completion from the server
+        } catch (err) {
+            setSaveError('Your score could not be saved. Please try again.')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    // ----- list view -----
+    if (!activeId) {
+        return (
+            <AppLayout>
+                <section className="profile-header">
+                    <div>
+                        <p className="eyebrow">Tutorial</p>
+                        <h2>Interactive Tutorial</h2>
+                        <p>
+                            Work through short visual modules on tiles, melds, and winning
+                            hands. Each module ends with a quick quiz, and your progress is
+                            saved to your account.
+                        </p>
+                    </div>
+                    <div className="hand-count">
+                        <strong>{completedCount}/{modules.length}</strong>
+                        <span>modules complete</span>
+                    </div>
+                </section>
+
+                {error && <p className="error-message">{error}</p>}
+
+                {isLoading ? (
+                    <div className="empty-state">
+                        <p>Loading modules…</p>
+                    </div>
+                ) : (
+                    <section className="feature-grid" aria-label="Tutorial modules">
+                        {modules.map((module) => (
+                            <article key={module.id} className="feature-card module-card">
+                                <div
+                                    className="module-card-head"
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
+                                >
+                                    <h3>{module.title}</h3>
+                                    {module.completed && (
+                                        <span
+                                            className="module-tick"
+                                            aria-label="Completed"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '1.6rem',
+                                                height: '1.6rem',
+                                                borderRadius: '50%',
+                                                background: '#22c55e',
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                            }}
+                                        >
+                                            ✓
+                                        </span>
+                                    )}
+                                </div>
+                                <p>{module.description}</p>
+                                <div
+                                    className="module-card-foot"
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1rem' }}
+                                >
+                                    {module.completed ? (
+                                        <span className="module-status">
+                                            Completed{module.quiz_score != null
+                                                ? ` · score ${module.quiz_score}`
+                                                : ''}
+                                        </span>
+                                    ) : (
+                                        <span className="module-status">Not started</span>
+                                    )}
+                                    <button
+                                        className="primary-button"
+                                        type="button"
+                                        onClick={() => openModule(module.id)}
+                                    >
+                                        {module.completed ? 'Review' : 'Start'}
+                                    </button>
+                                </div>
+                            </article>
+                        ))}
+                    </section>
+                )}
+            </AppLayout>
+        )
+    }
+
+    // ----- module view (unknown content guard) -----
+    if (!content) {
+        return (
+            <AppLayout>
+                <section className="profile-header">
+                    <div>
+                        <p className="eyebrow">Tutorial</p>
+                        <h2>{activeModule?.title || 'Module'}</h2>
+                        <p>Lesson content for this module is coming soon.</p>
+                    </div>
+                    <button className="secondary-button" type="button" onClick={backToList}>
+                        Back to modules
+                    </button>
+                </section>
+            </AppLayout>
+        )
+    }
+
+    const onQuizStep = step >= lessons.length
+    const progressPct = Math.round((Math.min(step, totalSteps - 1) / (totalSteps - 1)) * 100)
+
     return (
         <AppLayout>
             <section className="profile-header">
                 <div>
-                    <p className="eyebrow">Tutorial</p>
-                    <h2>Interactive Tutorial — coming soon</h2>
-                    <p>This page is being built. Module lessons and quizzes will appear here.</p>
+                    <p className="eyebrow">Tutorial · {activeModule?.title}</p>
+                    <h2>{onQuizStep ? 'Module quiz' : lessons[step].title}</h2>
+                    <p>
+                        Step {Math.min(step + 1, totalSteps)} of {totalSteps}
+                        {activeModule?.completed ? ' · already completed' : ''}
+                    </p>
                 </div>
+                <button className="secondary-button" type="button" onClick={backToList}>
+                    Back to modules
+                </button>
+            </section>
+
+            <div
+                className="tutorial-progress-bar"
+                aria-hidden="true"
+                style={{
+                    height: '8px',
+                    borderRadius: '999px',
+                    background: 'rgba(148, 163, 184, 0.25)',
+                    overflow: 'hidden',
+                    margin: '0 0 1.25rem',
+                }}
+            >
+                <div
+                    className="tutorial-progress-fill"
+                    style={{
+                        width: `${progressPct}%`,
+                        height: '100%',
+                        background: '#6366f1',
+                        transition: 'width 0.25s ease',
+                    }}
+                />
+            </div>
+
+            <section className="panel">
+                {onQuizStep ? (
+                    <>
+                        <Quiz
+                            key={activeId}
+                            questions={content.quiz}
+                            onComplete={handleQuizComplete}
+                            isSubmitting={isSubmitting}
+                        />
+                        {saveError && <p className="error-message">{saveError}</p>}
+                        {activeModule?.completed && (
+                            <div className="quiz-done-actions" style={{ marginTop: '1rem' }}>
+                                <button
+                                    className="secondary-button"
+                                    type="button"
+                                    onClick={backToList}
+                                >
+                                    Done — back to modules
+                                </button>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <LessonView lesson={lessons[step]} />
+                        <div
+                            className="lesson-nav"
+                            style={{ display: 'flex', gap: '0.75rem', justifyContent: 'space-between', marginTop: '1.5rem' }}
+                        >
+                            <button
+                                className="secondary-button"
+                                type="button"
+                                onClick={() => setStep((s) => Math.max(0, s - 1))}
+                                disabled={step === 0}
+                            >
+                                Previous
+                            </button>
+                            <button
+                                className="primary-button"
+                                type="button"
+                                onClick={() => setStep((s) => s + 1)}
+                            >
+                                {step === lessons.length - 1 ? 'Take the quiz' : 'Next'}
+                            </button>
+                        </div>
+                    </>
+                )}
             </section>
         </AppLayout>
     )
