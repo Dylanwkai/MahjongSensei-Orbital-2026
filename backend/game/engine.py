@@ -1,4 +1,5 @@
 import random
+from collections import Counter
 from dataclasses import dataclass
 
 
@@ -157,3 +158,107 @@ class HandGenerator:
         hand = Hand(tiles)
         hand.bonus_tiles = bonus_tiles
         return hand
+
+
+class HandEvaluator:
+    def evaluate_hand(self, tiles):
+        """
+        Return a rough hand strength score.
+
+        This is a first-pass evaluator for discard recommendations. It rewards
+        complete sets, pairs, and useful near-sequences, while subtracting for
+        isolated tiles.
+        """
+        playable_tiles = [tile for tile in tiles if not tile.is_bonus]
+        counts = Counter((tile.suit, tile.value) for tile in playable_tiles)
+
+        return (
+            self._score_groups(counts)
+            + self._score_numbered_sequences(playable_tiles)
+            - self._score_isolated_tiles(playable_tiles)
+        )
+
+    def _score_groups(self, counts):
+        score = 0
+
+        for count in counts.values():
+            if count >= 3:
+                score += 9
+            elif count == 2:
+                score += 4
+
+        return score
+
+    def _score_numbered_sequences(self, tiles):
+        score = 0
+
+        for suit in NUMBERED_SUITS:
+            values = {tile.value for tile in tiles if tile.suit == suit}
+
+            for value in range(1, 8):
+                if {value, value + 1, value + 2}.issubset(values):
+                    score += 8
+
+            for value in range(1, 9):
+                if {value, value + 1}.issubset(values):
+                    score += 3
+
+            for value in range(1, 8):
+                if {value, value + 2}.issubset(values):
+                    score += 2
+
+        return score
+
+    def _score_isolated_tiles(self, tiles):
+        penalty = 0
+        counts = Counter((tile.suit, tile.value) for tile in tiles)
+
+        for tile in tiles:
+            if counts[(tile.suit, tile.value)] > 1:
+                continue
+
+            if self._has_numbered_neighbour(tile, tiles):
+                continue
+
+            penalty += 2
+
+        return penalty
+
+    def _has_numbered_neighbour(self, tile, tiles):
+        if tile.suit not in NUMBERED_SUITS:
+            return False
+
+        nearby_values = {
+            other.value
+            for other in tiles
+            if other.suit == tile.suit and other != tile
+        }
+
+        return any(abs(tile.value - value) <= 2 for value in nearby_values)
+
+
+class ValuationAlgorithm:
+    def __init__(self, evaluator=None):
+        self.evaluator = evaluator or HandEvaluator()
+
+    def recommend_discard(self, hand):
+        best_discard = None
+        best_score = None
+
+        for tile in hand.sorted_tiles():
+            remaining_tiles = hand.tiles.copy()
+            remaining_tiles.remove(tile)
+            score = self.evaluator.evaluate_hand(remaining_tiles)
+
+            if best_score is None or score > best_score:
+                best_score = score
+                best_discard = tile
+
+        return {
+            "discard": best_discard.to_dict(),
+            "score": best_score,
+            "reasoning": (
+                f"Discarding {best_discard.label} keeps the strongest remaining "
+                "combination of sets, pairs, and near-sequences."
+            ),
+        }

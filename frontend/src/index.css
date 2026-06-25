@@ -472,6 +472,133 @@ a {
   font-size: 2rem;
 }
 
+.hand-count {
+  background: #eef8f6;
+  border: 1px solid #b8e1dc;
+  border-radius: 8px;
+  color: #0f766e;
+  min-width: 140px;
+  padding: 16px;
+  text-align: center;
+}
+
+.hand-count strong {
+  display: block;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.hand-count span {
+  color: #425166;
+  display: block;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.helper-layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(360px, 1.1fr) minmax(320px, 0.9fr);
+  margin-top: 24px;
+}
+
+.tile-picker-panel,
+.helper-result-panel {
+  background: #ffffff;
+  border: 1px solid #dde3ea;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(36, 48, 63, 0.08);
+  padding: 24px;
+}
+
+.picker-group + .picker-group {
+  margin-top: 22px;
+}
+
+.picker-grid,
+.selected-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.picker-grid {
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+}
+
+.honour-picker-grid {
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+}
+
+.selected-grid {
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+}
+
+.picker-tile,
+.selected-tile {
+  min-height: 92px;
+  width: 100%;
+}
+
+.picker-tile {
+  position: relative;
+}
+
+.picker-tile:hover:not(:disabled),
+.selected-tile:hover:not(:disabled) {
+  border-color: #0f766e;
+  box-shadow: 0 8px 18px rgba(36, 48, 63, 0.12);
+}
+
+.tile-count {
+  background: #17202a;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 6px;
+  position: absolute;
+  right: 6px;
+  top: 6px;
+}
+
+.helper-actions {
+  border-top: 1px solid #dde3ea;
+  margin-top: 22px;
+  padding-top: 18px;
+}
+
+.recommendation-panel {
+  background: #f6f7f9;
+  border: 1px solid #dde3ea;
+  border-radius: 8px;
+  margin-top: 20px;
+  padding: 18px;
+}
+
+.recommendation-content {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 96px 1fr;
+}
+
+.recommendation-content h3 {
+  margin: 0 0 8px;
+  text-transform: capitalize;
+}
+
+.recommendation-content p {
+  color: #425166;
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+
+.recommendation-content span {
+  color: #0f766e;
+  font-weight: 800;
+}
+
 @media (max-width: 820px) {
   .topbar,
   .page-content {
@@ -509,7 +636,12 @@ a {
   .feature-grid,
   .profile-grid,
   .stats-grid,
-  .demo-layout {
+  .demo-layout,
+  .helper-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendation-content {
     grid-template-columns: 1fr;
   }
 }

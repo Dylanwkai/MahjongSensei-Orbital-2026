@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Home from './pages/Home'
 import Profile from './pages/Profile'
+import HandHelper from './pages/HandHelper'
 
 // protects routes that require login
 function ProtectedRoute({ children }) {
@@ -31,6 +32,11 @@ function App() {
                     <Route path="/profile" element={
                         <ProtectedRoute>
                             <Profile />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/hand-helper" element={
+                        <ProtectedRoute>
+                            <HandHelper />
                         </ProtectedRoute>
                     } />
                     <Route path="/" element={<Navigate to="/login" />} />
