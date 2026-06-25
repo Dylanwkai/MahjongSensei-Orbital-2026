@@ -20,7 +20,9 @@ function AppLayout({ children }) {
 
                 <nav className="main-nav" aria-label="Main navigation">
                     <NavLink to="/home">Home</NavLink>
+                    <NavLink to="/tutorial">Tutorial</NavLink>
                     <NavLink to="/hand-helper">Hand Helper</NavLink>
+                    <NavLink to="/trainer">Trainer</NavLink>
                     <NavLink to="/profile">Profile</NavLink>
                 </nav>
 

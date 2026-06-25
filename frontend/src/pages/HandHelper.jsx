@@ -85,7 +85,7 @@ function HandHelper() {
     const addTile = (tile) => {
         const count = tileCounts[getTileKey(tile)] || 0
 
-        if (selectedTiles.length >= 13 || count >= 4) {
+        if (selectedTiles.length >= 14 || count >= 4) {
             return
         }
 
@@ -107,8 +107,8 @@ function HandHelper() {
     }
 
     const recommendDiscard = async () => {
-        if (selectedTiles.length !== 13) {
-            setError('Choose exactly 13 tiles before asking for a recommendation.')
+        if (selectedTiles.length !== 14) {
+            setError('Choose exactly 14 tiles before asking for a recommendation.')
             return
         }
 
@@ -135,12 +135,12 @@ function HandHelper() {
                     <p className="eyebrow">Hand Helper</p>
                     <h2>Find a recommended discard</h2>
                     <p>
-                        Build a 13-tile hand, then ask the backend evaluator which discard
+                        Build a 14-tile hand, then ask the backend evaluator which discard
                         leaves the strongest remaining structure.
                     </p>
                 </div>
                 <div className="hand-count">
-                    <strong>{selectedTiles.length}/13</strong>
+                    <strong>{selectedTiles.length}/14</strong>
                     <span>tiles selected</span>
                 </div>
             </section>
@@ -168,7 +168,7 @@ function HandHelper() {
                                             tile={tile}
                                             count={count}
                                             onClick={addTile}
-                                            disabled={selectedTiles.length >= 13 || count >= 4}
+                                            disabled={selectedTiles.length >= 14 || count >= 4}
                                         />
                                     )
                                 })}
@@ -188,7 +188,7 @@ function HandHelper() {
                                         tile={tile}
                                         count={count}
                                         onClick={addTile}
-                                        disabled={selectedTiles.length >= 13 || count >= 4}
+                                        disabled={selectedTiles.length >= 14 || count >= 4}
                                     />
                                 )
                             })}
@@ -200,7 +200,7 @@ function HandHelper() {
                     <div className="panel-heading">
                         <div>
                             <p className="eyebrow">Current hand</p>
-                            <h3>{selectedTiles.length === 13 ? 'Ready to evaluate' : 'Keep selecting tiles'}</h3>
+                            <h3>{selectedTiles.length === 14 ? 'Ready to evaluate' : 'Keep selecting tiles'}</h3>
                         </div>
                         <button className="secondary-button" type="button" onClick={clearHand}>
                             Clear
@@ -228,7 +228,7 @@ function HandHelper() {
                             className="primary-button"
                             type="button"
                             onClick={recommendDiscard}
-                            disabled={selectedTiles.length !== 13 || isLoading}
+                            disabled={selectedTiles.length !== 14 || isLoading}
                         >
                             {isLoading ? 'Evaluating...' : 'Recommend Discard'}
                         </button>

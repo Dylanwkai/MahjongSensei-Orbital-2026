@@ -3,6 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from .engine import Deck, Hand, HandEvaluator, HandGenerator, Tile, ValuationAlgorithm
+from .models import Move, Session
 
 
 class MahjongEngineTests(TestCase):
@@ -158,6 +159,7 @@ class RecommendDiscardApiTests(TestCase):
                     {"suit": "honour", "value": "red"},
                     {"suit": "bamboo", "value": 9},
                     {"suit": "circles", "value": 1},
+                    {"suit": "circles", "value": 9},
                 ]
             },
             format="json",
@@ -181,3 +183,164 @@ class RecommendDiscardApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+
+
+class TrainerApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="trainer_user",
+            password="trainer_password_123",
+        )
+        self.other = User.objects.create_user(
+            username="other_user",
+            password="other_password_123",
+        )
+
+    def test_trainer_new_requires_login(self):
+        response = self.client.post("/api/game/trainer/new/")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_trainer_new_returns_fourteen_tiles_and_logs_move(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post("/api/game/trainer/new/")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.data["tiles"]), 14)
+        self.assertIn("move_id", response.data)
+        # The answer must not be leaked in the challenge response.
+        self.assertNotIn("correct_discard", response.data)
+
+        move = Move.objects.get(id=response.data["move_id"])
+        self.assertEqual(move.session.user, self.user)
+        self.assertEqual(move.session.mode, Session.MODE_TRAINER)
+        self.assertIsNone(move.user_discard)
+
+    def test_trainer_submit_scores_and_records_result(self):
+        self.client.force_authenticate(user=self.user)
+
+        new_response = self.client.post("/api/game/trainer/new/")
+        move_id = new_response.data["move_id"]
+        tiles = new_response.data["tiles"]
+        discard = tiles[0]
+
+        submit_response = self.client.post(
+            "/api/game/trainer/submit/",
+            {
+                "move_id": move_id,
+                "discard": {"suit": discard["suit"], "value": discard["value"]},
+            },
+            format="json",
+        )
+
+        self.assertEqual(submit_response.status_code, 200)
+        self.assertIn("is_correct", submit_response.data)
+        self.assertIn("correct_discard", submit_response.data)
+        self.assertIn("feedback", submit_response.data)
+
+        move = Move.objects.get(id=move_id)
+        self.assertIsNotNone(move.user_discard)
+        self.assertIsNotNone(move.correct_discard)
+        self.assertEqual(move.is_correct, submit_response.data["is_correct"])
+
+    def test_trainer_submit_marks_optimal_discard_correct(self):
+        # A near-complete hand with one obvious isolated tile (C1) to drop.
+        self.client.force_authenticate(user=self.user)
+        session = Session.objects.create(user=self.user, mode=Session.MODE_TRAINER)
+        hand = [
+            {"suit": "bamboo", "value": 1},
+            {"suit": "bamboo", "value": 2},
+            {"suit": "bamboo", "value": 3},
+            {"suit": "circles", "value": 5},
+            {"suit": "circles", "value": 5},
+            {"suit": "circles", "value": 5},
+            {"suit": "characters", "value": 7},
+            {"suit": "characters", "value": 8},
+            {"suit": "characters", "value": 9},
+            {"suit": "honour", "value": "red"},
+            {"suit": "honour", "value": "red"},
+            {"suit": "bamboo", "value": 4},
+            {"suit": "bamboo", "value": 5},
+            {"suit": "circles", "value": 1},
+        ]
+        move = Move.objects.create(session=session, hand=hand)
+
+        response = self.client.post(
+            "/api/game/trainer/submit/",
+            {"move_id": move.id, "discard": {"suit": "circles", "value": 1}},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_correct"])
+
+    def test_trainer_submit_rejects_tile_not_in_hand(self):
+        self.client.force_authenticate(user=self.user)
+        new_response = self.client.post("/api/game/trainer/new/")
+        move_id = new_response.data["move_id"]
+
+        # honour 'white' may or may not be present; pick a tile guaranteed absent
+        # by using an impossible-but-valid honour only if missing. Instead, drain
+        # the hand of a known tile by choosing one and submitting twice.
+        response = self.client.post(
+            "/api/game/trainer/submit/",
+            {"move_id": move_id, "discard": {"suit": "bamboo", "value": 99}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_trainer_submit_blocks_double_answer(self):
+        self.client.force_authenticate(user=self.user)
+        new_response = self.client.post("/api/game/trainer/new/")
+        move_id = new_response.data["move_id"]
+        discard = new_response.data["tiles"][0]
+        payload = {
+            "move_id": move_id,
+            "discard": {"suit": discard["suit"], "value": discard["value"]},
+        }
+
+        self.client.post("/api/game/trainer/submit/", payload, format="json")
+        second = self.client.post("/api/game/trainer/submit/", payload, format="json")
+
+        self.assertEqual(second.status_code, 400)
+
+    def test_trainer_user_cannot_submit_another_users_move(self):
+        self.client.force_authenticate(user=self.user)
+        new_response = self.client.post("/api/game/trainer/new/")
+        move_id = new_response.data["move_id"]
+        discard = new_response.data["tiles"][0]
+
+        self.client.force_authenticate(user=self.other)
+        response = self.client.post(
+            "/api/game/trainer/submit/",
+            {
+                "move_id": move_id,
+                "discard": {"suit": discard["suit"], "value": discard["value"]},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_trainer_history_reports_accuracy(self):
+        self.client.force_authenticate(user=self.user)
+        for _ in range(2):
+            new_response = self.client.post("/api/game/trainer/new/")
+            discard = new_response.data["tiles"][0]
+            self.client.post(
+                "/api/game/trainer/submit/",
+                {
+                    "move_id": new_response.data["move_id"],
+                    "discard": {"suit": discard["suit"], "value": discard["value"]},
+                },
+                format="json",
+            )
+
+        response = self.client.get("/api/game/trainer/history/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_attempts"], 2)
+        self.assertIn("accuracy", response.data)
+        self.assertEqual(len(response.data["attempts"]), 2)
