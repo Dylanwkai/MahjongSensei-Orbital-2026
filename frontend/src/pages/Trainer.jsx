@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
+import TileCard from '../components/TileCard'
 
 function tileKey(tile, index) {
     return `${tile.code}-${index}`
@@ -36,6 +37,7 @@ function ResultTile({ tile }) {
 
 function Trainer() {
     const [tiles, setTiles] = useState([])
+    const [bonusTiles, setBonusTiles] = useState([])
     const [moveId, setMoveId] = useState(null)
     const [selectedIndex, setSelectedIndex] = useState(null)
     const [result, setResult] = useState(null)
@@ -53,6 +55,7 @@ function Trainer() {
         try {
             const response = await api.post('/api/game/trainer/new/')
             setTiles(response.data.tiles)
+            setBonusTiles(response.data.bonus_tiles || [])
             setMoveId(response.data.move_id)
         } catch (err) {
             setError('Could not load a new hand. Please log in again and retry.')
@@ -159,6 +162,17 @@ function Trainer() {
                     ) : (
                         <div className="empty-state">
                             <p>{isLoading ? 'Requesting a hand from Django...' : 'No hand yet.'}</p>
+                        </div>
+                    )}
+
+                    {bonusTiles.length > 0 && (
+                        <div className="bonus-section">
+                            <p className="eyebrow">Bonus tiles drawn ({bonusTiles.length})</p>
+                            <div className="meld-row">
+                                {bonusTiles.map((tile, index) => (
+                                    <TileCard key={`${tile.code}-${index}`} tile={tile} size="sm" />
+                                ))}
+                            </div>
                         </div>
                     )}
 

@@ -6,11 +6,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .engine import (
+    ANIMAL_VALUES,
+    FLOWER_VALUES,
     HONOUR_VALUES,
     NUMBERED_SUITS,
+    WINDS,
     Hand,
     HandEvaluator,
     HandGenerator,
+    ScoreCalculator,
     Tile,
     ValuationAlgorithm,
     WinChecker,
@@ -41,6 +45,18 @@ def parse_tile(tile_data):
         return Tile(suit, value)
 
     raise ValueError("Only suited and honour tiles are allowed in a hand.")
+
+
+def parse_bonus_tile(tile_data):
+    suit = tile_data.get("suit")
+    value = tile_data.get("value")
+
+    if suit == "flower" and value in FLOWER_VALUES:
+        return Tile("flower", value, is_bonus=True)
+    if suit == "animal" and value in ANIMAL_VALUES:
+        return Tile("animal", value, is_bonus=True)
+
+    raise ValueError("Bonus tiles must be valid flower or animal tiles.")
 
 
 class RecommendDiscardView(APIView):
@@ -101,9 +117,10 @@ class CheckWinView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if len(tile_data) != 14:
+        if not 14 <= len(tile_data) <= 18:
             return Response(
-                {"error": "A winning hand must contain exactly 14 playable tiles."},
+                {"error": "A winning hand must contain 14 to 18 playable tiles "
+                          "(14, plus one extra per Kong)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -123,6 +140,67 @@ class CheckWinView(APIView):
             )
 
         return Response(WinChecker().check(tiles))
+
+
+class ScoreHandView(APIView):
+    """POST /api/game/score-hand/
+
+    Body: {
+        "tiles": [ {suit, value}, ... ],          # 14-18 playable tiles
+        "bonus_tiles": [ {suit, value}, ... ],    # optional flowers / animals
+        "seat_wind": "east",                       # player's seat (position)
+        "round_wind": "east"                       # prevailing wind
+    }
+    Checks the hand and, if it wins, scores it in tai (with the minimum-tai
+    rule applied).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        tile_data = request.data.get("tiles", [])
+        bonus_data = request.data.get("bonus_tiles", [])
+        seat_wind = request.data.get("seat_wind", "east")
+        round_wind = request.data.get("round_wind", "east")
+
+        if not isinstance(tile_data, list) or not isinstance(bonus_data, list):
+            return Response(
+                {"error": "tiles and bonus_tiles must be lists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not 14 <= len(tile_data) <= 18:
+            return Response(
+                {"error": "Hand must contain 14 to 18 playable tiles."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if seat_wind not in WINDS or round_wind not in WINDS:
+            return Response(
+                {"error": "seat_wind and round_wind must be one of east/south/west/north."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            tiles = [parse_tile(tile) for tile in tile_data]
+            bonus_tiles = [parse_bonus_tile(tile) for tile in bonus_data]
+        except (AttributeError, ValueError) as error:
+            return Response(
+                {"error": str(error)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tile_counts = Counter((tile.suit, tile.value) for tile in tiles)
+        if any(count > 4 for count in tile_counts.values()):
+            return Response(
+                {"error": "A hand cannot contain more than 4 copies of the same tile."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        win = WinChecker().check(tiles)
+        score = ScoreCalculator(seat_wind, round_wind).score(win, bonus_tiles)
+
+        return Response({"win": win, "score": score})
 
 
 # ---------------------------------------------------------------------------
@@ -159,13 +237,26 @@ class TrainerNewView(APIView):
     def post(self, request):
         hand = HandGenerator().generate_random_hand(hand_size=TRAINER_HAND_SIZE)
 
-        session, _ = Session.objects.get_or_create(
-            user=request.user,
-            mode=Session.MODE_TRAINER,
-            defaults={},
+        # Reuse the user's most recent trainer session, or start one. We avoid
+        # get_or_create here because a user can legitimately have more than one
+        # trainer session (e.g. concurrent "new hand" requests on mount), and
+        # get_or_create raises MultipleObjectsReturned in that case.
+        session = (
+            Session.objects.filter(
+                user=request.user,
+                mode=Session.MODE_TRAINER,
+            )
+            .order_by("-created_at")
+            .first()
         )
+        if session is None:
+            session = Session.objects.create(
+                user=request.user,
+                mode=Session.MODE_TRAINER,
+            )
 
         tile_dicts = [tile.to_dict() for tile in hand.sorted_tiles()]
+        bonus_dicts = [tile.to_dict() for tile in hand.bonus_tiles]
         move = Move.objects.create(session=session, hand=tile_dicts)
 
         return Response(
@@ -173,6 +264,7 @@ class TrainerNewView(APIView):
                 "move_id": move.id,
                 "session_id": session.id,
                 "tiles": tile_dicts,
+                "bonus_tiles": bonus_dicts,
             },
             status=status.HTTP_201_CREATED,
         )

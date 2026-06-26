@@ -2,15 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
-
-function Tile({ tile }) {
-    return (
-        <li className={`tile tile-${tile.suit}`}>
-            <span className="tile-code">{tile.code}</span>
-            <span className="tile-label">{tile.label}</span>
-        </li>
-    )
-}
+import HandDisplay from '../components/HandDisplay'
 
 function Home() {
     const { user, profile } = useAuth()
@@ -95,55 +87,17 @@ function Home() {
                     </div>
 
                     {hand ? (
-                        <>
-                            <ul className="tile-grid">
-                                {hand.tiles.map((tile, index) => (
-                                    <Tile key={`${tile.code}-${index}`} tile={tile} />
-                                ))}
-                            </ul>
-
-                            {hand.bonus_tiles.length > 0 && (
-                                <div className="bonus-section">
-                                    <p className="eyebrow">Bonus tiles</p>
-                                    <ul className="bonus-list">
-                                        {hand.bonus_tiles.map((tile, index) => (
-                                            <Tile key={`${tile.code}-${index}`} tile={tile} />
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </>
+                        <HandDisplay
+                            tiles={hand.tiles}
+                            melds={hand.melds || []}
+                            bonusTiles={hand.bonus_tiles || []}
+                        />
                     ) : (
                         <div className="empty-state">
                             <p>Click generate to request a hand from Django.</p>
                         </div>
                     )}
                 </section>
-            </section>
-
-            <section className="roadmap-section">
-                <div className="section-heading">
-                    <p className="eyebrow">Feature base</p>
-                    <h2>What this unlocks next</h2>
-                </div>
-                <div className="feature-grid">
-                    <article className="feature-card">
-                        <h3>Rules Guide</h3>
-                        <p>Use the same layout and profile session to store tutorial progress.</p>
-                    </article>
-                    <article className="feature-card">
-                        <h3>Hand Helper</h3>
-                        <p>Reuse tile serialization and API patterns for user-submitted hands.</p>
-                    </article>
-                    <article className="feature-card">
-                        <h3>Trainer</h3>
-                        <p>Reuse generated hands, then add best-discard logic and feedback.</p>
-                    </article>
-                    <article className="feature-card">
-                        <h3>SoloPlay</h3>
-                        <p>Build later on the engine once validation and valuation are stable.</p>
-                    </article>
-                </div>
             </section>
         </AppLayout>
     )

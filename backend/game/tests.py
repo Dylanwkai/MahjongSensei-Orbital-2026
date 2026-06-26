@@ -7,6 +7,7 @@ from .engine import (
     Hand,
     HandEvaluator,
     HandGenerator,
+    ScoreCalculator,
     Tile,
     ValuationAlgorithm,
     WinChecker,
@@ -522,6 +523,223 @@ class CheckWinApiTests(TestCase):
         response = self.client.post(
             "/api/game/check-win/",
             {"tiles": [{"suit": "bamboo", "value": 1}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+
+class KongTests(TestCase):
+    def setUp(self):
+        self.checker = WinChecker()
+
+    def test_standard_win_with_a_kong_has_fifteen_tiles(self):
+        # Kong of 8K, pong of 6C, chow 234B, chow 678B, pair of Red = 15 tiles.
+        hand = tiles(
+            "K", 8, "K", 8, "K", 8, "K", 8,
+            "C", 6, "C", 6, "C", 6,
+            "B", 2, "B", 3, "B", 4,
+            "B", 6, "B", 7, "B", 8,
+            "H", "red", "H", "red",
+        )
+        result = self.checker.check(hand)
+        self.assertTrue(result["is_winning"])
+        self.assertEqual(result["pattern"], "standard")
+        meld_types = [meld["type"] for meld in result["melds"]]
+        self.assertIn("kong", meld_types)
+
+    def test_declare_kong_sets_tiles_aside_and_redraws(self):
+        hand = Hand(tiles("B", 5, "B", 5, "B", 5, "B", 5, "C", 1, "C", 2))
+        deck = Deck()
+        deck.shuffle()
+        before = len(hand.tiles)
+
+        replacement = hand.declare_kong("bamboo", 5, deck)
+
+        self.assertIsNotNone(replacement)
+        self.assertFalse(replacement.is_bonus)
+        self.assertEqual(len(hand.declared_kongs), 1)
+        self.assertEqual(len(hand.declared_kongs[0]), 4)
+        # Four tiles removed, one replacement drawn.
+        self.assertEqual(len(hand.tiles), before - 4 + 1)
+
+    def test_declare_kong_without_four_matching_tiles_raises(self):
+        hand = Hand(tiles("B", 5, "B", 5, "B", 5, "C", 1))
+        with self.assertRaises(ValueError):
+            hand.declare_kong("bamboo", 5, Deck())
+
+    def test_declared_kong_is_a_concealed_locked_meld(self):
+        hand = Hand(tiles("B", 5, "B", 5, "B", 5, "B", 5, "C", 1))
+        hand.declare_kong("bamboo", 5, Deck())
+
+        self.assertEqual(len(hand.melds), 1)
+        self.assertEqual(hand.melds[0].kind, "kong")
+        self.assertFalse(hand.melds[0].claimed)  # self-declared = concealed
+
+
+class ClaimMeldTests(TestCase):
+    def test_claim_pong_exposes_and_locks_the_meld(self):
+        hand = Hand(tiles("C", 5, "C", 5, "B", 1, "B", 2))
+        meld = hand.claim_pong("circles", 5)
+
+        self.assertEqual(meld.kind, "pong")
+        self.assertTrue(meld.claimed)          # claimed from a discard
+        self.assertFalse(meld.is_concealed)    # so it is exposed
+        self.assertEqual(len(meld.tiles), 3)
+        self.assertEqual(len(hand.melds), 1)
+        # The two matching tiles left the rearrangeable concealed hand.
+        self.assertFalse(
+            any(t.suit == "circles" and t.value == 5 for t in hand.tiles)
+        )
+
+    def test_claim_pong_without_two_matching_tiles_raises(self):
+        hand = Hand(tiles("C", 5, "B", 1, "B", 2))
+        with self.assertRaises(ValueError):
+            hand.claim_pong("circles", 5)
+
+    def test_claim_chow_uses_two_concealed_tiles(self):
+        hand = Hand(tiles("B", 3, "B", 4, "C", 1))
+        meld = hand.claim_chow("bamboo", 3, claimed_value=5)
+
+        self.assertEqual(meld.kind, "chow")
+        self.assertTrue(meld.claimed)
+        self.assertEqual([t.value for t in meld.tiles], [3, 4, 5])
+        # B3 and B4 were consumed from the concealed hand.
+        self.assertEqual(
+            [t for t in hand.tiles if t.suit == "bamboo"], []
+        )
+
+    def test_claim_kong_from_discard_is_exposed_and_redraws(self):
+        hand = Hand(tiles("K", 8, "K", 8, "K", 8, "C", 1))
+        deck = Deck()
+        deck.shuffle()
+        meld = hand.claim_kong("characters", 8, deck)
+
+        self.assertEqual(meld.kind, "kong")
+        self.assertTrue(meld.claimed)
+        self.assertEqual(len(meld.tiles), 4)
+        # 3 tiles removed, 1 replacement drawn (started with C1 + 3x K8 = 4).
+        self.assertEqual(len(hand.tiles), 2)
+
+    def test_to_dict_exposes_claimed_flag(self):
+        hand = Hand(tiles("C", 5, "C", 5, "B", 1, "B", 1, "B", 1))
+        hand.claim_pong("circles", 5)
+        data = hand.to_dict()
+
+        self.assertEqual(len(data["melds"]), 1)
+        self.assertTrue(data["melds"][0]["claimed"])
+        self.assertFalse(data["melds"][0]["concealed"])
+
+
+class ScoreCalculatorTests(TestCase):
+    def _winning_wind_hand(self):
+        # 234B chow, 666C pong, 789K chow, East pong, Red pair.
+        return tiles(
+            "B", 2, "B", 3, "B", 4,
+            "C", 6, "C", 6, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "H", "east", "H", "east", "H", "east",
+            "H", "red", "H", "red",
+        )
+
+    def test_seat_and_round_wind_pong_each_score_one_tai(self):
+        win = WinChecker().check(self._winning_wind_hand())
+        score = ScoreCalculator(seat_wind="east", round_wind="east").score(win)
+
+        self.assertTrue(score["is_valid_win"])
+        self.assertEqual(score["hand_tai"], 2)  # seat wind + round wind
+
+    def test_chicken_hand_fails_minimum_tai_even_with_a_flower(self):
+        # All chows, no winds/dragons/flush -> 0 hand tai.
+        hand = tiles(
+            "B", 1, "B", 2, "B", 3,
+            "B", 1, "B", 2, "B", 3,
+            "C", 4, "C", 5, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "C", 9, "C", 9,
+        )
+        win = WinChecker().check(hand)
+        flower = Tile("flower", "red_1", is_bonus=True)  # East's seat flower
+        score = ScoreCalculator(seat_wind="east", round_wind="east").score(win, [flower])
+
+        self.assertEqual(score["hand_tai"], 0)
+        self.assertEqual(score["bonus_tai"], 1)
+        self.assertFalse(score["is_valid_win"])  # flowers don't meet the minimum
+
+    def test_full_flush_all_pongs_scores(self):
+        # Four bamboo pongs + bamboo pair: full flush + all pongs.
+        hand = tiles(
+            "B", 1, "B", 1, "B", 1,
+            "B", 2, "B", 2, "B", 2,
+            "B", 3, "B", 3, "B", 3,
+            "B", 4, "B", 4, "B", 4,
+            "B", 5, "B", 5,
+        )
+        win = WinChecker().check(hand)
+        score = ScoreCalculator(seat_wind="east", round_wind="east").score(win)
+
+        labels = [item["label"] for item in score["breakdown"]]
+        self.assertIn("Full Flush", labels)
+        self.assertIn("All Pongs", labels)
+        self.assertEqual(score["hand_tai"], 6)
+        self.assertTrue(score["is_valid_win"])
+
+
+class ScoreHandApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="score_user",
+            password="score_password_123",
+        )
+        self.wind_hand = [
+            {"suit": "bamboo", "value": 2},
+            {"suit": "bamboo", "value": 3},
+            {"suit": "bamboo", "value": 4},
+            {"suit": "circles", "value": 6},
+            {"suit": "circles", "value": 6},
+            {"suit": "circles", "value": 6},
+            {"suit": "characters", "value": 7},
+            {"suit": "characters", "value": 8},
+            {"suit": "characters", "value": 9},
+            {"suit": "honour", "value": "east"},
+            {"suit": "honour", "value": "east"},
+            {"suit": "honour", "value": "east"},
+            {"suit": "honour", "value": "red"},
+            {"suit": "honour", "value": "red"},
+        ]
+
+    def test_score_hand_requires_login(self):
+        response = self.client.post(
+            "/api/game/score-hand/", {"tiles": self.wind_hand}, format="json"
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_score_hand_scores_a_winning_wind_hand(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/game/score-hand/",
+            {"tiles": self.wind_hand, "seat_wind": "east", "round_wind": "east"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["win"]["is_winning"])
+        self.assertTrue(response.data["score"]["is_valid_win"])
+        self.assertGreaterEqual(response.data["score"]["hand_tai"], 2)
+
+    def test_score_hand_rejects_bad_seat_wind(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/game/score-hand/",
+            {"tiles": self.wind_hand, "seat_wind": "dragon", "round_wind": "east"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_score_hand_rejects_wrong_tile_count(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/game/score-hand/",
+            {"tiles": self.wind_hand[:5]},
             format="json",
         )
         self.assertEqual(response.status_code, 400)

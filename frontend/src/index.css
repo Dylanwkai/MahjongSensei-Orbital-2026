@@ -391,6 +391,76 @@ a {
   padding-top: 18px;
 }
 
+/* Hand display: exposed melds + concealed tiles + bonus row */
+.hand-display {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hand-section .eyebrow,
+.bonus-section .eyebrow {
+  margin-bottom: 10px;
+}
+
+.meld-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.meld-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #dde3ea;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.meld-group .meld-tiles {
+  display: flex;
+  gap: 4px;
+}
+
+/* Claimed melds are exposed (shown face-up) and locked */
+.meld-claimed {
+  border-color: #f4c95d;
+  background: #fffaf0;
+}
+
+/* Concealed melds (e.g. a concealed Kong): locked but hidden styling */
+.meld-concealed {
+  border-style: dashed;
+}
+
+.meld-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #735100;
+}
+
+.meld-concealed .meld-tag {
+  color: #5f6f83;
+}
+
+.tile-sm {
+  width: 54px;
+  padding: 5px;
+}
+
+.tile-sm .tile-code {
+  font-size: 0.95rem;
+}
+
+.tile-sm .tile-label {
+  font-size: 0.6rem;
+  margin-top: 4px;
+}
+
 .empty-state {
   align-items: center;
   border: 1px dashed #b7c2d0;
