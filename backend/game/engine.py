@@ -467,7 +467,7 @@ class WinChecker:
         return None
 
     def _decompose_melds(self, counts, need):
-        # Done when we've formed exactly `need` melds and used every tile.
+        # Done when we've formed exactly need number of melds and used every tile.
         if need == 0:
             return [] if not counts else None
         if not counts:
