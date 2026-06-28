@@ -1,19 +1,11 @@
-"""Solo Play engine (Feature 4) — Steps 1-4.
+"""Solo Play game logic.
 
-A full 4-player Singapore Mahjong table: one human seat (East by default) plus
-three AI opponents. This module implements the core game loop:
+Runs a 4 player game with one human (East by default) and three AI opponents.
+Handles dealing, the draw/discard turns, AI moves, flowers, concealed Kongs,
+self-drawn wins and the washout draw. Claiming tiles off other players'
+discards is not done yet.
 
-  Step 1 - Player + SoloGame skeleton, dealing, flower replacement, dealer seat.
-  Step 2 - Draw / discard turn loop, self-draw win detection, washout (wall out).
-  Step 3 - AI opponents that draw and discard using the ValuationAlgorithm.
-  Step 4 - Bonus tiles drawn mid-game are set aside and replaced; a player who
-           draws a 4th matching tile may declare a concealed Kong and redraw.
-
-Claiming Pong/Kong/Chow from other players' discards is Step 5 (not yet here);
-turn order currently passes strictly to the next seat after each discard.
-
-The engine is server-authoritative and self-contained (no Django imports), so it
-can be unit-tested directly and later driven by an API.
+No Django imports here so it can be tested on its own.
 """
 
 from collections import Counter
@@ -25,14 +17,11 @@ from .engine import (
     WinChecker,
 )
 
-# Seats are seated counter-clockwise starting from the dealer (East).
 SEAT_WINDS = ("east", "south", "west", "north")
 HAND_SIZE = 13
 
-# The last 15 tiles are the "dead wall" / reserve and are not drawn in normal
-# play — when only 15 tiles remain the hand ends in a washout draw. (Kong and
-# flower replacement tiles are taken from this reserve, so they may still draw
-# below 15.)
+# Stop normal draws once only this many tiles are left (the dead wall). Kong and
+# flower replacements can still be drawn from it.
 WALL_RESERVE = 15
 
 
@@ -44,8 +33,7 @@ class Player:
         self.hand = Hand([])
 
     def all_tiles(self):
-        """Concealed tiles plus every tile locked in a meld — the full hand used
-        for win checking."""
+        """Concealed tiles plus the tiles in any melds, used for win checking."""
         tiles = list(self.hand.tiles)
         for meld in self.hand.melds:
             tiles.extend(meld.tiles)
@@ -84,10 +72,9 @@ class SoloGame:
         self.phase = "draw"  # 'draw' | 'discard' | 'over'
         self.result = None  # None (ongoing) | 'win' | 'washout'
         self.winner_index = None
-        self.win_type = None  # 'self_draw' (claim wins come in Step 6)
+        self.win_type = None  # 'self_draw' for now
         self.log = []
 
-    # ----- setup (Step 1) -------------------------------------------------
     def start(self):
         self.deck.shuffle()
         for player in self.players:
@@ -105,10 +92,8 @@ class SoloGame:
             tile = self.deck.draw()
         player.hand.tiles.append(tile)
 
-    # ----- turn loop (Steps 2-4) -----------------------------------------
     def play_until_human(self):
-        """Advance the game (running AI turns) until it is the human's turn to
-        discard, or the game ends."""
+        """Run AI turns until it is the human's turn to discard or the game ends."""
         while self.result is None:
             player = self._current()
 
@@ -176,15 +161,12 @@ class SoloGame:
         return tile
 
     def _draw_live_tile(self, player):
-        """Draw a playable tile for a normal turn, setting aside any bonus tiles
-        drawn. Triggers a washout once only the 15-tile reserve remains."""
-        # Normal draws stop at the dead-wall reserve.
+        """Draw a normal tile, setting aside any bonus tiles. Returns None and
+        ends the game in a washout once only the reserve is left."""
         if len(self.deck) <= WALL_RESERVE:
             self.phase = "over"
             self.result = "washout"
-            self._log(
-                f"Only the {WALL_RESERVE}-tile reserve remains — washout draw."
-            )
+            self._log(f"Only {WALL_RESERVE} tiles left, washout draw.")
             return None
 
         tile = self.deck.draw()
@@ -195,7 +177,7 @@ class SoloGame:
             if len(self.deck) == 0:
                 self.phase = "over"
                 self.result = "washout"
-                self._log("The wall is fully exhausted — washout draw.")
+                self._log("Wall fully exhausted, washout draw.")
                 return None
             tile = self.deck.draw()
         return tile
@@ -228,7 +210,6 @@ class SoloGame:
                 return tile
         return player.hand.tiles[0]
 
-    # ----- win / helpers --------------------------------------------------
     def _is_winning(self, player):
         return WinChecker().check(player.all_tiles())["is_winning"]
 
@@ -250,10 +231,9 @@ class SoloGame:
     def _log(self, message):
         self.log.append(message)
 
-    # ----- serialization --------------------------------------------------
     def public_state(self):
-        """The human's view of the table: own tiles revealed, opponents hidden
-        (until the game is over)."""
+        """Return the table from the human's side: own tiles shown, opponents
+        hidden until the game ends."""
         game_over = self.result is not None
         return {
             "round_wind": self.round_wind,

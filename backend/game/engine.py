@@ -26,14 +26,12 @@ SUIT_CODE = {
     "animal": "A",
 }
 
-# The four winds and three dragons live inside the "honour" suit. Splitting
-# them out lets the scorer tell a wind pong from a dragon pong.
+# Winds and dragons are both stored under the "honour" suit; split them so the
+# scorer can tell them apart.
 WINDS = ("east", "south", "west", "north")
 DRAGONS = ("red", "green", "white")
 
-# Seat numbering is the "position tracker": each seat owns the flower whose
-# number matches it (East=1 owns red_1 / blue_1, South=2 owns red_2 / blue_2...)
-# and scores its own seat wind. This drives wind- and flower-position scoring.
+# Each seat owns the flower with its number (east owns red_1/blue_1, etc).
 SEAT_NUMBER = {"east": 1, "south": 2, "west": 3, "north": 4}
 SEAT_WIND_BY_NUMBER = {number: wind for wind, number in SEAT_NUMBER.items()}
 
@@ -68,18 +66,16 @@ class Tile:
 
 
 class Meld:
-    """A formed set of tiles: a Pong, Kong, or Chow.
+    """A Pong, Kong or Chow.
 
-    `claimed` marks a meld made by claiming another player's discarded tile.
-    A claimed meld is **exposed** (shown face-up to everyone) and **locked** —
-    its tiles are fixed and can no longer be rearranged into other combinations.
-    `claimed=False` is a concealed meld formed from your own hand (e.g. a
-    concealed Kong); it is also locked, but stays hidden for scoring purposes.
+    claimed=True means the meld was made by taking another player's discard, so
+    it is shown face up and its tiles are fixed. claimed=False is a meld formed
+    from your own hand (like a concealed Kong), which stays hidden.
     """
 
     def __init__(self, kind, tiles, claimed=False):
-        self.kind = kind          # 'pong' | 'kong' | 'chow'
-        self.tiles = list(tiles)  # the Tile objects making up the meld
+        self.kind = kind          # pong, kong or chow
+        self.tiles = list(tiles)
         self.claimed = claimed
 
     @property
@@ -101,26 +97,25 @@ class Meld:
 
 class Hand:
     def __init__(self, tiles):
-        self.tiles = [t for t in tiles if not t.is_bonus]   # concealed, rearrangeable
-        self.bonus_tiles = [t for t in tiles if t.is_bonus] # set aside
-        self.declared_kongs = []  # list of 4-tile groups set aside as Kongs
-        self.melds = []           # exposed/locked Meld objects (see Meld)
+        self.tiles = [t for t in tiles if not t.is_bonus]   # concealed tiles
+        self.bonus_tiles = [t for t in tiles if t.is_bonus] # flowers/animals
+        self.declared_kongs = []
+        self.melds = []
 
     def discard(self, tile):
         self.tiles.remove(tile)
         return self.tiles
 
     def claim_pong(self, suit, value):
-        """Claim another player's discard to complete a Pong, using two matching
-        tiles from your concealed hand. The meld is exposed and locked."""
+        """Claim a discard to make a Pong using two matching tiles in hand."""
         used = self._take_matching(suit, value, 2, "Pong")
         meld = Meld("pong", used + [Tile(suit, value)], claimed=True)
         self.melds.append(meld)
         return meld
 
     def claim_kong(self, suit, value, deck=None):
-        """Claim a discard to complete a Kong, using three matching tiles from
-        your concealed hand. Exposed, locked, and draws a replacement tile."""
+        """Claim a discard to make a Kong using three matching tiles in hand,
+        then draw a replacement."""
         used = self._take_matching(suit, value, 3, "Kong")
         meld = Meld("kong", used + [Tile(suit, value)], claimed=True)
         self.melds.append(meld)
@@ -129,10 +124,8 @@ class Hand:
         return meld
 
     def claim_chow(self, suit, low_value, claimed_value=None):
-        """Claim a discard to complete a Chow (run of three) using two tiles
-        from your concealed hand. `low_value` is the run's lowest tile;
-        `claimed_value` is which tile was the discard (defaults to the lowest).
-        Exposed and locked. Chows only form in numbered suits."""
+        """Claim a discard to make a Chow using two tiles in hand. low_value is
+        the run's lowest tile and claimed_value is the discarded tile."""
         if suit not in NUMBERED_SUITS or not isinstance(low_value, int) or low_value > 7:
             raise ValueError("A Chow is three consecutive numbers in a numbered suit.")
 
@@ -181,17 +174,8 @@ class Hand:
         return replacement
 
     def declare_kong(self, suit, value, deck=None):
-        """Set four matching tiles aside as a declared Kong and draw a
-        replacement tile.
-
-        A Kong is a set of four identical tiles. Because a winning hand is
-        always four sets plus a pair, every Kong makes the hand one tile larger
-        than a normal meld would — so after declaring a Kong you draw one
-        replacement tile to keep playing. Any bonus tile drawn as the
-        replacement is itself set aside and redrawn.
-
-        Returns the replacement Tile (or None if no deck was supplied).
-        """
+        """Set four matching tiles aside as a concealed Kong and draw a
+        replacement. Returns the replacement tile, or None if no deck is given."""
         matching = [t for t in self.tiles if t.suit == suit and t.value == value]
         if len(matching) < 4:
             raise ValueError("Need four matching tiles to declare a Kong.")
@@ -200,7 +184,6 @@ class Hand:
         for tile in kong_tiles:
             self.tiles.remove(tile)
         self.declared_kongs.append(kong_tiles)
-        # A self-declared Kong is concealed (claimed=False), but still locked.
         self.melds.append(Meld("kong", kong_tiles, claimed=False))
 
         if deck is None:
@@ -210,7 +193,7 @@ class Hand:
 
     def add_tile(self, tile):
         if tile.is_bonus:
-            self.bonus_tiles.append(tile)  # bonus tiles go to bonus pile
+            self.bonus_tiles.append(tile)
         else:
             self.tiles.append(tile)
         return self.tiles
@@ -267,8 +250,7 @@ class Deck:
         return self.tiles.pop()
 
     def draw_replacement(self):
-        """Draw a replacement tile, e.g. after declaring a Kong or drawing a
-        bonus tile. Functionally a normal draw in this simplified engine."""
+        """Draw a replacement tile after a Kong or a bonus tile."""
         return self.draw()
 
     def __len__(self):
@@ -413,8 +395,8 @@ class ValuationAlgorithm:
         }
 
 
-# Thirteen Orphans needs one of every terminal (1 & 9 in each numbered suit)
-# plus all seven honour tiles — 13 distinct tiles, one of them duplicated.
+# Thirteen Orphans: one of every terminal (1 and 9 in each suit) and every
+# honour tile, with one of them duplicated.
 ORPHAN_TILES = frozenset(
     [(suit, value) for suit in NUMBERED_SUITS for value in (1, 9)]
     + [("honour", honour) for honour in HONOUR_VALUES]
@@ -424,25 +406,19 @@ _SUIT_ORDER = {"characters": 0, "bamboo": 1, "circles": 2, "honour": 3}
 _HONOUR_ORDER = {honour: index for index, honour in enumerate(HONOUR_VALUES)}
 
 PATTERN_LABELS = {
-    "standard": "Standard hand — four melds and a pair",
+    "standard": "Standard hand: four melds and a pair",
     "seven_pairs": "Seven Pairs",
     "thirteen_orphans": "Thirteen Orphans",
 }
 
 
 class WinChecker:
-    """Detects whether a hand is a complete (winning) hand.
+    """Checks whether a hand is a complete winning hand.
 
-    Recognizes three winning shapes:
-      * standard         - four sets (Pong / Chow / Kong) plus one pair
-      * seven_pairs      - seven distinct pairs (14 tiles only)
-      * thirteen_orphans - one of every terminal and honour, plus a duplicate
-
-    Bonus tiles (flowers / animals) are ignored. A normal hand is 14 tiles, but
-    each Kong is a set of four tiles instead of three, so a standard hand can be
-    14 tiles (no Kong) up to 18 tiles (four Kongs). For a standard win the result
-    also includes the decomposition (the pair and the four melds) so the scorer
-    can award points for wind / dragon pongs and Kongs.
+    Handles three shapes: standard (four sets plus a pair), seven pairs, and
+    thirteen orphans. Bonus tiles are ignored. A hand is normally 14 tiles, but
+    each Kong adds one, so a standard hand can be 14 to 18 tiles. For a standard
+    win the result also includes the pair and melds so the scorer can use them.
     """
 
     def check(self, tiles):
@@ -450,14 +426,14 @@ class WinChecker:
         count = len(playable)
         counts = Counter((tile.suit, tile.value) for tile in playable)
 
-        # Seven Pairs and Thirteen Orphans are exactly-14-tile shapes.
+        # Seven pairs and thirteen orphans are 14 tiles only.
         if count == 14:
             if self._is_thirteen_orphans(counts):
                 return self._result(True, "thirteen_orphans")
             if self._is_seven_pairs(counts):
                 return self._result(True, "seven_pairs")
 
-        # Standard hand: 4 sets + a pair. 14 tiles with no Kong, +1 per Kong.
+        # Standard hand: four sets and a pair, plus one tile per Kong.
         if 14 <= count <= 18:
             decomposition = self.decompose_standard(counts)
             if decomposition is not None:
@@ -470,7 +446,6 @@ class WinChecker:
 
         return self._result(False, None)
 
-    # ----- winning shapes -------------------------------------------------
     def _is_seven_pairs(self, counts):
         return len(counts) == 7 and all(count == 2 for count in counts.values())
 
@@ -480,9 +455,9 @@ class WinChecker:
         return sorted(counts.values()) == [1] * 12 + [2]
 
     def decompose_standard(self, counts):
-        """Return {"pair": key, "melds": [...]} for the first valid standard
-        decomposition, or None. Each meld is {"type": "pong"|"kong"|"chow",
-        "tile": (suit, value)} where for a chow the tile is its lowest tile."""
+        """Return the first valid {pair, melds} split, or None. Each meld is
+        {"type": pong/kong/chow, "tile": (suit, value)}; a chow's tile is its
+        lowest."""
         for key, count in counts.items():
             if count >= 2:
                 trial = self._subtract(counts, [key, key])
@@ -525,11 +500,8 @@ class WinChecker:
         return None
 
     def iter_standard(self, counts):
-        """Yield every valid standard decomposition {"pair", "melds"}.
-
-        A hand can often be read more than one way (e.g. three pongs vs. three
-        chows), and the scorer needs to pick the best-scoring reading, so this
-        enumerates all of them."""
+        """Yield every valid {pair, melds} split. A hand can be read more than
+        one way, so the scorer uses this to find the best scoring reading."""
         for key, count in counts.items():
             if count >= 2:
                 trial = self._subtract(counts, [key, key])
@@ -560,7 +532,6 @@ class WinChecker:
                 for rest in self._iter_melds(self._subtract(counts, run), need - 1):
                     yield [{"type": "chow", "tile": key}] + rest
 
-    # ----- helpers --------------------------------------------------------
     @staticmethod
     def _subtract(counts, keys):
         reduced = dict(counts)
@@ -588,31 +559,21 @@ class WinChecker:
         }
 
 
-# ---------------------------------------------------------------------------
-# Point (Tai) system
-#
-# Singapore Mahjong scores in "tai" (points). These default values follow the
-# common Singapore rule set; change them here to match your house rules. The
-# minimum-tai rule means a hand must be worth at least MIN_TAI_TO_WIN to be a
-# legal win (you cannot win a "chicken hand" worth nothing).
-#
-# By default flowers/animals do NOT count toward that minimum, so you still
-# need a real tai from the hand itself (a wind/dragon pong, a flush, etc.).
-# Flip FLOWERS_COUNT_TOWARD_MIN to True if your group lets flowers qualify.
-# ---------------------------------------------------------------------------
-
+# Tai (point) values. Edit these to match a different house rule set. A hand
+# must be worth at least MIN_TAI_TO_WIN, and by default flowers do not count
+# towards that minimum.
 SCORING = {
-    "seat_wind": 1,      # pong/kong of your own seat wind
-    "round_wind": 1,     # pong/kong of the prevailing (round) wind
-    "dragon": 1,         # pong/kong of a dragon (red / green / white)
-    "seat_flower": 1,    # a flower whose number matches your seat
-    "animal": 1,         # each animal (cat / mouse / centipede / chicken)
-    "no_flower": 1,      # holding no flowers and no animals at all
-    "all_pongs": 2,      # every set is a pong/kong (no chows)
-    "half_flush": 2,     # one numbered suit plus honours
-    "full_flush": 4,     # a single numbered suit, no honours
-    "seven_pairs": 2,    # the Seven Pairs pattern
-    "thirteen_orphans": 4,  # the Thirteen Orphans pattern
+    "seat_wind": 1,
+    "round_wind": 1,
+    "dragon": 1,
+    "seat_flower": 1,
+    "animal": 1,
+    "no_flower": 1,         # no flowers and no animals at all
+    "all_pongs": 2,
+    "half_flush": 2,        # one suit plus honours
+    "full_flush": 4,        # one suit, no honours
+    "seven_pairs": 2,
+    "thirteen_orphans": 4,
 }
 
 MIN_TAI_TO_WIN = 1
@@ -620,7 +581,7 @@ FLOWERS_COUNT_TOWARD_MIN = False
 
 
 def parse_flower(value):
-    """'red_3' -> ('red', 3). Returns (None, None) if it isn't a flower value."""
+    """'red_3' -> ('red', 3), or (None, None) if not a flower."""
     try:
         color, number = value.split("_")
         return color, int(number)
@@ -629,12 +590,8 @@ def parse_flower(value):
 
 
 class ScoreCalculator:
-    """Scores a winning hand in tai, given the player's seat and the round wind.
-
-    `seat_wind` is the player's position (east/south/west/north) and also
-    determines which flowers are theirs. `round_wind` is the prevailing wind.
-    These two together are the "wind tracker / position tracker".
-    """
+    """Scores a winning hand in tai. seat_wind is the player's seat (and decides
+    their flowers); round_wind is the prevailing wind."""
 
     def __init__(self, seat_wind="east", round_wind="east", scoring=None):
         self.seat_wind = seat_wind
@@ -686,10 +643,8 @@ class ScoreCalculator:
             ),
         }
 
-    # ----- standard-hand scoring -----------------------------------------
     def _score_standard(self, win_result, breakdown):
-        # A hand may decompose multiple ways; score every reading and keep the
-        # highest-scoring one (you always score your hand the best legal way).
+        # Score every way the hand can be read and keep the best.
         counts = self._counts_from_result(win_result)
         best_tai = None
         best_breakdown = []
@@ -774,7 +729,6 @@ class ScoreCalculator:
             return self._add(breakdown, "Half Flush", self.scoring["half_flush"])
         return 0
 
-    # ----- flower / animal scoring ---------------------------------------
     def _score_bonus(self, bonus_tiles, breakdown):
         seat_number = SEAT_NUMBER.get(self.seat_wind)
         flowers = [tile for tile in bonus_tiles if tile.suit == "flower"]

@@ -5,11 +5,8 @@ import TileCard, { makeTile } from '../components/TileCard'
 import MeldDemo from '../components/MeldDemo'
 import Quiz from '../components/Quiz'
 
-// ---------------------------------------------------------------------------
-// Client-side lesson content, keyed by the module ids served from the backend
-// (tiles, melds, winning-hands). The backend stores completion + scores,
-// actual teaching content lives here so it is easy to extend.
-// ---------------------------------------------------------------------------
+// Lesson content for each module id (tiles, melds, winning-hands). The backend
+// only stores completion and scores; the teaching content lives here.
 
 const LESSON_CONTENT = {
     tiles: {
@@ -302,7 +299,7 @@ function Tutorial() {
         }
     }
 
-    // ----- list view -----
+    // module list
     if (!activeId) {
         return (
             <AppLayout>
@@ -387,7 +384,7 @@ function Tutorial() {
         )
     }
 
-    // ----- module view (unknown content guard) -----
+    // module view
     if (!content) {
         return (
             <AppLayout>
