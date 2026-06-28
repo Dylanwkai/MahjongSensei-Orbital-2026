@@ -1,12 +1,8 @@
 import TileCard from './TileCard'
 
-// Renders a player's hand: any exposed/claimed melds (shown face-up and locked),
-// the concealed tiles, and a bonus row for flowers / animals that have been
-// drawn and set aside. Each tile/meld is the dict shape the Django engine emits
-// (see Hand.to_dict / Meld.to_dict).
-//
-// Pass `children` to control how the concealed tiles render (e.g. the Trainer's
-// clickable picker); otherwise the concealed tiles render read-only.
+// Shows a hand: exposed melds, the concealed tiles, and a bonus row for
+// flowers/animals. Pass children to render the concealed tiles yourself (for an
+// interactive picker); otherwise they render read-only.
 
 function MeldGroup({ meld }) {
     const stateClass = meld.claimed ? 'meld-claimed' : 'meld-concealed'

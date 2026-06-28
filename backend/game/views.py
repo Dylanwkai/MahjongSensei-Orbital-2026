@@ -204,17 +204,8 @@ class ScoreHandView(APIView):
         return Response({"win": win, "score": score})
 
 
-# ---------------------------------------------------------------------------
-# Interactive Trainer (Feature 3)
-#
-# Flow:
-#   1. POST /api/game/trainer/new/    -> generates a 14-tile hand, logs a pending
-#      Move, and returns the tiles + move_id (without revealing the answer).
-#   2. POST /api/game/trainer/submit/ -> the user picks a discard; the server
-#      scores it against ValuationAlgorithm, records the result on the Move,
-#      and returns immediate feedback.
-#   3. GET  /api/game/trainer/history/ -> the user's past attempts.
-# ---------------------------------------------------------------------------
+# Interactive Trainer endpoints: deal a hand (new), score the user's discard
+# and log it (submit), and list past attempts (history).
 
 TRAINER_HAND_SIZE = 14
 
@@ -395,14 +386,9 @@ class TrainerHistoryView(APIView):
         )
 
 
-# ---------------------------------------------------------------------------
-# Solo Play (Feature 4) — Steps 1-4.
-#
-# The game is stateful, so the SoloGame object is kept server-side, keyed by
-# user, in a simple in-memory store. This is a prototype convenience: games are
-# lost if the server restarts, and results are NOT yet written to the profile /
-# stats (intentionally left unlinked for now).
-# ---------------------------------------------------------------------------
+# Solo Play endpoints. The game is stateful so each user's SoloGame is kept in
+# an in-memory dict, which means a game is lost if the server restarts. Results
+# are not written to the profile yet.
 
 _SOLO_GAMES = {}  # user_id -> SoloGame
 
