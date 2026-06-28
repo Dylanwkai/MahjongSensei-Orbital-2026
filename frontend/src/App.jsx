@@ -7,6 +7,7 @@ import Profile from './pages/Profile'
 import HandHelper from './pages/HandHelper'
 import Trainer from './pages/Trainer'
 import Tutorial from './pages/Tutorial'
+import SoloPlay from './pages/SoloPlay'
 
 // protects routes that require login
 function ProtectedRoute({ children }) {
@@ -49,6 +50,11 @@ function App() {
                     <Route path="/tutorial" element={
                         <ProtectedRoute>
                             <Tutorial />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/solo" element={
+                        <ProtectedRoute>
+                            <SoloPlay />
                         </ProtectedRoute>
                     } />
                     <Route path="/" element={<Navigate to="/login" />} />

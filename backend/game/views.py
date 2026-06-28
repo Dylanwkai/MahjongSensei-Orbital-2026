@@ -20,6 +20,7 @@ from .engine import (
     WinChecker,
 )
 from .models import Move, Session
+from .solo import SoloGame
 
 
 class RandomHandView(APIView):
@@ -392,3 +393,76 @@ class TrainerHistoryView(APIView):
                 "attempts": attempts,
             }
         )
+
+
+# ---------------------------------------------------------------------------
+# Solo Play (Feature 4) — Steps 1-4.
+#
+# The game is stateful, so the SoloGame object is kept server-side, keyed by
+# user, in a simple in-memory store. This is a prototype convenience: games are
+# lost if the server restarts, and results are NOT yet written to the profile /
+# stats (intentionally left unlinked for now).
+# ---------------------------------------------------------------------------
+
+_SOLO_GAMES = {}  # user_id -> SoloGame
+
+
+def _get_solo_game(request):
+    return _SOLO_GAMES.get(request.user.id)
+
+
+class SoloNewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        game = SoloGame(human_seat="east")
+        game.start()
+        _SOLO_GAMES[request.user.id] = game
+        return Response(game.public_state(), status=status.HTTP_201_CREATED)
+
+
+class SoloStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        game = _get_solo_game(request)
+        if game is None:
+            return Response(
+                {"error": "No active game. Start a new one."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(game.public_state())
+
+
+class SoloDiscardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        game = _get_solo_game(request)
+        if game is None:
+            return Response(
+                {"error": "No active game. Start a new one."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            game.human_discard(request.data.get("suit"), request.data.get("value"))
+        except ValueError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(game.public_state())
+
+
+class SoloKongView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        game = _get_solo_game(request)
+        if game is None:
+            return Response(
+                {"error": "No active game. Start a new one."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            game.human_declare_kong(request.data.get("suit"), request.data.get("value"))
+        except ValueError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(game.public_state())

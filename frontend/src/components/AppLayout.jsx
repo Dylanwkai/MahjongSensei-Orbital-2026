@@ -23,6 +23,7 @@ function AppLayout({ children }) {
                     <NavLink to="/tutorial">Tutorial</NavLink>
                     <NavLink to="/hand-helper">Hand Helper</NavLink>
                     <NavLink to="/trainer">Trainer</NavLink>
+                    <NavLink to="/solo">Solo Play</NavLink>
                     <NavLink to="/profile">Profile</NavLink>
                 </nav>
 

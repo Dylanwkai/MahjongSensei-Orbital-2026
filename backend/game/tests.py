@@ -13,6 +13,7 @@ from .engine import (
     WinChecker,
 )
 from .models import Move, Session
+from .solo import SEAT_WINDS, SoloGame
 
 
 def tiles(*specs):
@@ -628,6 +629,165 @@ class ClaimMeldTests(TestCase):
         self.assertEqual(len(data["melds"]), 1)
         self.assertTrue(data["melds"][0]["claimed"])
         self.assertFalse(data["melds"][0]["concealed"])
+
+
+class SoloGameTests(TestCase):
+    def test_start_deals_four_hands_then_dealer_draws(self):
+        game = SoloGame(human_seat="east")
+        game.start()
+
+        # Four seated players in wind order, no bonus tiles in concealed hands.
+        self.assertEqual([p.seat_wind for p in game.players], list(SEAT_WINDS))
+        for player in game.players:
+            self.assertTrue(all(not t.is_bonus for t in player.hand.tiles))
+
+        # Everyone is dealt 13; start() advances to the dealer's turn, so the
+        # current player has drawn to 14 and is awaiting a discard.
+        if game.result is None:
+            current = game.current_index
+            self.assertEqual(len(game.players[current].hand.tiles), 14)
+            for index, player in enumerate(game.players):
+                if index != current:
+                    self.assertEqual(len(player.hand.tiles), 13)
+
+    def test_human_dealer_starts_with_fourteen_awaiting_discard(self):
+        game = SoloGame(human_seat="east")  # East is dealer and human
+        game.start()
+
+        # After start, play advances to the human's turn: they've drawn (14)
+        # and the game is waiting for their discard.
+        if game.result is None:
+            self.assertTrue(game.public_state()["is_human_turn"])
+            self.assertEqual(game.phase, "discard")
+            self.assertEqual(len(game.players[game.human_index()].hand.tiles), 14)
+
+    def test_opponents_hands_hidden_until_game_over(self):
+        game = SoloGame(human_seat="east")
+        game.start()
+        state = game.public_state()
+
+        for player_state in state["players"]:
+            if player_state["is_human"]:
+                self.assertIsNotNone(player_state["tiles"])
+            elif state["result"] is None:
+                self.assertIsNone(player_state["tiles"])  # opponents concealed
+
+    def test_full_game_runs_to_completion_without_error(self):
+        import random
+
+        random.seed(0)
+        game = SoloGame(human_seat="east")
+        game.start()
+
+        # Simulate the human always discarding their first tile; the engine
+        # plays the AI seats. The game must terminate (win or washout).
+        guard = 0
+        while game.result is None and guard < 500:
+            guard += 1
+            human = game.players[game.human_index()]
+            tile = human.hand.tiles[0]
+            game.human_discard(tile.suit, tile.value)
+
+        self.assertIsNotNone(game.result)
+        self.assertIn(game.result, ("win", "washout"))
+        self.assertEqual(game.phase, "over")
+
+    def test_concealed_tiles_never_include_bonus_during_play(self):
+        import random
+
+        random.seed(1)
+        game = SoloGame(human_seat="east")
+        game.start()
+
+        guard = 0
+        while game.result is None and guard < 500:
+            guard += 1
+            human = game.players[game.human_index()]
+            for player in game.players:
+                self.assertTrue(all(not t.is_bonus for t in player.hand.tiles))
+            tile = human.hand.tiles[0]
+            game.human_discard(tile.suit, tile.value)
+
+    def test_washout_triggers_at_sixteen_tile_reserve(self):
+        from .solo import WALL_RESERVE
+
+        game = SoloGame(human_seat="east")
+        game.start()
+
+        # Leave exactly RESERVE + 1 plain (non-bonus) tiles in the wall.
+        game.deck.tiles = [Tile("bamboo", 5) for _ in range(WALL_RESERVE + 1)]
+        game.phase = "draw"
+        game.result = None
+
+        self.assertIsNotNone(game._draw_current())  # 17 -> draw allowed, 16 left
+        self.assertIsNone(game._draw_current())     # 16 reserve -> washout
+        self.assertEqual(game.result, "washout")
+
+    def test_self_draw_win_is_detected(self):
+        # Force the human into a complete hand, then confirm the engine flags it.
+        game = SoloGame(human_seat="east")
+        winning = tiles(
+            "B", 2, "B", 3, "B", 4,
+            "C", 6, "C", 6, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "H", "east", "H", "east", "H", "east",
+            "H", "red", "H", "red",
+        )
+        game.players[0].hand.tiles = winning
+        self.assertTrue(game._is_winning(game.players[0]))
+
+
+class SoloApiTests(TestCase):
+    def setUp(self):
+        from .views import _SOLO_GAMES
+
+        _SOLO_GAMES.clear()  # in-memory store persists across tests; reset it
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="solo_user", password="solo_password_123"
+        )
+
+    def test_solo_endpoints_require_login(self):
+        self.assertEqual(self.client.post("/api/game/solo/new/").status_code, 401)
+        self.assertEqual(self.client.get("/api/game/solo/state/").status_code, 401)
+
+    def test_state_is_404_before_a_game_starts(self):
+        self.client.force_authenticate(user=self.user)
+        self.assertEqual(self.client.get("/api/game/solo/state/").status_code, 404)
+
+    def test_new_game_deals_and_returns_state(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post("/api/game/solo/new/")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.data["players"]), 4)
+        # Opponents' concealed tiles stay hidden; the human's are revealed.
+        human = next(p for p in response.data["players"] if p["is_human"])
+        self.assertIsNotNone(human["tiles"])
+        for player in response.data["players"]:
+            if not player["is_human"] and response.data["result"] is None:
+                self.assertIsNone(player["tiles"])
+
+    def test_human_can_discard_and_state_advances(self):
+        self.client.force_authenticate(user=self.user)
+        start = self.client.post("/api/game/solo/new/").data
+        if start["result"] is not None:
+            return  # extremely rare instant end; nothing to discard
+
+        human = next(p for p in start["players"] if p["is_human"])
+        tile = human["tiles"][0]
+        response = self.client.post(
+            "/api/game/solo/discard/",
+            {"suit": tile["suit"], "value": tile["value"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # After discarding, the engine has run the AI seats and either returned
+        # to the human's turn or ended the game.
+        self.assertTrue(
+            response.data["is_human_turn"] or response.data["result"] is not None
+        )
 
 
 class ScoreCalculatorTests(TestCase):
