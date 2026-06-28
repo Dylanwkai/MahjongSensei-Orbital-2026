@@ -31,7 +31,7 @@ SUIT_CODE = {
 WINDS = ("east", "south", "west", "north")
 DRAGONS = ("red", "green", "white")
 
-# Each seat owns the flower with its number (east owns red_1/blue_1, etc).
+# Each seat owns the flower with its number.
 SEAT_NUMBER = {"east": 1, "south": 2, "west": 3, "north": 4}
 SEAT_WIND_BY_NUMBER = {number: wind for wind, number in SEAT_NUMBER.items()}
 
@@ -396,7 +396,7 @@ class ValuationAlgorithm:
 
 
 # Thirteen Orphans: one of every terminal (1 and 9 in each suit) and every
-# honour tile, with one of them duplicated.
+# honour tile, with one of them pair.
 ORPHAN_TILES = frozenset(
     [(suit, value) for suit in NUMBERED_SUITS for value in (1, 9)]
     + [("honour", honour) for honour in HONOUR_VALUES]
