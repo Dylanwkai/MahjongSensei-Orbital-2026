@@ -568,12 +568,13 @@ SCORING = {
     "dragon": 1,
     "seat_flower": 1,
     "animal": 1,
-    "no_flower": 1,         # no flowers and no animals at all
     "all_pongs": 2,
     "half_flush": 2,        # one suit plus honours
     "full_flush": 4,        # one suit, no honours
     "seven_pairs": 2,
-    "thirteen_orphans": 4,
+    "thirteen_orphans": 5,
+    "pinghu": 4,            # four chows + a pair, no flowers/animals
+    "smelly_pinghu": 1,     # the same shape but with at least one flower/animal
 }
 
 MIN_TAI_TO_WIN = 1
@@ -598,7 +599,14 @@ class ScoreCalculator:
         self.round_wind = round_wind
         self.scoring = scoring or SCORING
 
-    def score(self, win_result, bonus_tiles=None):
+    def score(self, win_result, bonus_tiles=None, win_type=None, winning_tile=None):
+        """Score a winning hand.
+
+        win_type ('self_draw' / 'ron') and winning_tile are optional context used
+        only by Pinghu: a Pinghu may be scored on a self-draw, or on a discard
+        (Ron) only when the hand had a two-sided wait (two or more tiles could
+        have completed it). Without this context Pinghu is not awarded.
+        """
         bonus_tiles = bonus_tiles or []
 
         if not win_result.get("is_winning"):
@@ -614,6 +622,11 @@ class ScoreCalculator:
         breakdown = []
         pattern = win_result.get("pattern")
         hand_tai = 0
+
+        # Context Pinghu depends on: a valid wait, and whether any bonus tiles
+        # are present (which downgrades a Pinghu to a Smelly Pinghu).
+        self._pinghu_eligible = self._pinghu_wait_ok(win_result, win_type, winning_tile)
+        self._has_bonus = len(bonus_tiles) > 0
 
         if pattern == "seven_pairs":
             hand_tai += self._add(breakdown, "Seven Pairs", self.scoring["seven_pairs"])
@@ -694,6 +707,21 @@ class ScoreCalculator:
         if melds and all(meld["type"] in ("pong", "kong") for meld in melds):
             tai += self._add(breakdown, "All Pongs", self.scoring["all_pongs"])
 
+        # Pinghu: four chows plus a pair, provided the winning-tile condition
+        # was met. A clean hand scores Pinghu; one with any flower/animal scores
+        # the reduced Smelly Pinghu instead.
+        if (
+            len(melds) == 4
+            and all(meld["type"] == "chow" for meld in melds)
+            and getattr(self, "_pinghu_eligible", False)
+        ):
+            if getattr(self, "_has_bonus", False):
+                tai += self._add(
+                    breakdown, "Smelly Pinghu", self.scoring["smelly_pinghu"]
+                )
+            else:
+                tai += self._add(breakdown, "Pinghu", self.scoring["pinghu"])
+
         # Flush, based on the suits present across pair + melds.
         tai += self._score_flush(decomposition, breakdown)
         return tai
@@ -717,6 +745,49 @@ class ScoreCalculator:
                 add((suit, value + 1), 1)
                 add((suit, value + 2), 1)
         return counts
+
+    def _pinghu_wait_ok(self, win_result, win_type, winning_tile):
+        """Whether the winning-tile condition for a Pinghu is satisfied: a
+        self-draw always qualifies; a discarded (Ron) tile qualifies only when
+        the hand had a two-or-more-sided wait."""
+        if win_type == "self_draw":
+            return True
+        if (
+            win_type == "ron"
+            and winning_tile is not None
+            and win_result.get("pattern") == "standard"
+        ):
+            counts = self._counts_from_result(win_result)
+            return self._count_completing_tiles(counts, winning_tile) >= 2
+        return False
+
+    def _count_completing_tiles(self, full_counts, winning_tile):
+        """From the 13-tile wait (the full hand minus the winning tile), count
+        how many distinct tiles would have completed a standard winning hand."""
+        key = (winning_tile.suit, winning_tile.value)
+        if full_counts.get(key, 0) <= 0:
+            return 0
+
+        wait = dict(full_counts)
+        wait[key] -= 1
+        if wait[key] == 0:
+            del wait[key]
+
+        winners = 0
+        for candidate in self._all_tile_keys():
+            if wait.get(candidate, 0) >= 4:
+                continue
+            trial = dict(wait)
+            trial[candidate] = trial.get(candidate, 0) + 1
+            if WinChecker().decompose_standard(trial) is not None:
+                winners += 1
+        return winners
+
+    @staticmethod
+    def _all_tile_keys():
+        keys = [(suit, value) for suit in NUMBERED_SUITS for value in range(1, 10)]
+        keys += [("honour", value) for value in HONOUR_VALUES]
+        return keys
 
     def _score_flush(self, decomposition, breakdown):
         keys = [decomposition["pair"]] + [meld["tile"] for meld in decomposition["melds"]]
@@ -744,9 +815,6 @@ class ScoreCalculator:
 
         for tile in animals:
             tai += self._add(breakdown, f"Animal: {tile.value}", self.scoring["animal"])
-
-        if not flowers and not animals:
-            tai += self._add(breakdown, "No flowers", self.scoring["no_flower"])
 
         return tai
 
