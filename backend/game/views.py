@@ -452,3 +452,47 @@ class SoloKongView(APIView):
         except ValueError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(game.public_state())
+
+
+class SoloClaimView(APIView):
+    """POST /api/game/solo/claim/
+
+    Body: { "action": "pong"|"kong"|"chow"|"win", "low_value": <int, chow only> }
+    Claim the current discard. low_value picks which run to use for a Chow.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        game = _get_solo_game(request)
+        if game is None:
+            return Response(
+                {"error": "No active game. Start a new one."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            game.human_claim(
+                request.data.get("action"), low_value=request.data.get("low_value")
+            )
+        except ValueError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(game.public_state())
+
+
+class SoloPassView(APIView):
+    """POST /api/game/solo/pass/  Pass on the current claim."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        game = _get_solo_game(request)
+        if game is None:
+            return Response(
+                {"error": "No active game. Start a new one."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            game.human_pass_claim()
+        except ValueError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(game.public_state())

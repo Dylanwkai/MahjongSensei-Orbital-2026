@@ -44,6 +44,121 @@ function Opponent({ player }) {
     )
 }
 
+function ClaimPrompt({ claim, onClaim, onPass, disabled }) {
+    const suit = claim.tile.suit
+    return (
+        <section className="tile-picker-panel claim-prompt" style={{ marginTop: 24 }}>
+            <div className="panel-heading">
+                <div>
+                    <p className="eyebrow">Claim available</p>
+                    <h3 style={{ textTransform: 'capitalize' }}>{claim.from_seat} discarded {claim.tile.label}</h3>
+                </div>
+                <div className="meld-row">
+                    <TileCard tile={claim.tile} size="sm" />
+                </div>
+            </div>
+            <div className="helper-actions">
+                <div className="meld-row" style={{ flexWrap: 'wrap' }}>
+                    {claim.actions.includes('win') && (
+                        <button className="primary-button" type="button" disabled={disabled} onClick={() => onClaim('win')}>
+                            Win
+                        </button>
+                    )}
+                    {claim.actions.includes('kong') && (
+                        <button className="secondary-button" type="button" disabled={disabled} onClick={() => onClaim('kong')}>
+                            Kong
+                        </button>
+                    )}
+                    {claim.actions.includes('pong') && (
+                        <button className="secondary-button" type="button" disabled={disabled} onClick={() => onClaim('pong')}>
+                            Pong
+                        </button>
+                    )}
+                    {claim.actions.includes('chow') && (
+                        (claim.chow_options && claim.chow_options.length > 0
+                            ? claim.chow_options
+                            : [undefined]
+                        ).map((low, i) => (
+                            <button
+                                key={`chow-${low ?? i}`}
+                                className="secondary-button"
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => onClaim('chow', low)}
+                            >
+                                {low !== undefined && ['bamboo', 'circles', 'characters'].includes(suit)
+                                    ? `Chow ${low}-${low + 1}-${low + 2}`
+                                    : 'Chow'}
+                            </button>
+                        ))
+                    )}
+                    <button className="secondary-button" type="button" disabled={disabled} onClick={onPass}>
+                        Pass
+                    </button>
+                </div>
+            </div>
+        </section>
+    )
+}
+
+function WinSummary({ win }) {
+    return (
+        <section className="tile-picker-panel win-summary" style={{ marginTop: 24 }}>
+            <div className="panel-heading">
+                <div>
+                    <p className="eyebrow">Round over</p>
+                    <h3 style={{ textTransform: 'capitalize' }}>
+                        {win.winner_name} wins by {(win.win_type || '').replace('_', ' ')} — {win.total_tai} tai
+                    </h3>
+                    <p style={{ color: '#666' }}>
+                        {win.pattern_label}
+                        {win.winning_tile ? ` · winning tile ${win.winning_tile.label}` : ''}
+                    </p>
+                </div>
+            </div>
+
+            <p className="eyebrow" style={{ marginTop: 8 }}>Winning hand</p>
+            <MeldRow melds={win.melds} />
+            <div className="meld-row" style={{ marginTop: win.melds?.length ? 12 : 0, flexWrap: 'wrap' }}>
+                {win.tiles.map((tile, i) => (
+                    <TileCard key={`${tile.code}-${i}`} tile={tile} size="sm" />
+                ))}
+            </div>
+
+            {win.bonus_tiles?.length > 0 && (
+                <>
+                    <p className="eyebrow" style={{ marginTop: 12 }}>Bonus tiles</p>
+                    <div className="meld-row" style={{ flexWrap: 'wrap' }}>
+                        {win.bonus_tiles.map((tile, i) => (
+                            <TileCard key={`bonus-${tile.code}-${i}`} tile={tile} size="sm" />
+                        ))}
+                    </div>
+                </>
+            )}
+
+            <p className="eyebrow" style={{ marginTop: 12 }}>Tai breakdown</p>
+            {win.breakdown && win.breakdown.length > 0 ? (
+                <table className="tai-breakdown">
+                    <tbody>
+                        {win.breakdown.map((row, i) => (
+                            <tr key={i}>
+                                <td>{row.label}</td>
+                                <td style={{ textAlign: 'right' }}>{row.tai} tai</td>
+                            </tr>
+                        ))}
+                        <tr className="tai-total">
+                            <td><strong>Total</strong></td>
+                            <td style={{ textAlign: 'right' }}><strong>{win.total_tai} tai</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            ) : (
+                <p style={{ color: '#666' }}>No scoring elements ({win.total_tai} tai).</p>
+            )}
+        </section>
+    )
+}
+
 function SoloPlay() {
     const [state, setState] = useState(null)
     const [error, setError] = useState('')
@@ -111,6 +226,36 @@ function SoloPlay() {
         }
     }
 
+    const claim = async (action, lowValue) => {
+        setIsBusy(true)
+        setError('')
+        try {
+            const body = { action }
+            if (lowValue !== undefined) {
+                body.low_value = lowValue
+            }
+            const response = await api.post('/api/game/solo/claim/', body)
+            setState(response.data)
+        } catch (err) {
+            setError(err.response?.data?.error || 'Could not make that claim.')
+        } finally {
+            setIsBusy(false)
+        }
+    }
+
+    const passClaim = async () => {
+        setIsBusy(true)
+        setError('')
+        try {
+            const response = await api.post('/api/game/solo/pass/')
+            setState(response.data)
+        } catch (err) {
+            setError(err.response?.data?.error || 'Could not pass.')
+        } finally {
+            setIsBusy(false)
+        }
+    }
+
     const human = useMemo(
         () => state?.players.find((player) => player.is_human) || null,
         [state],
@@ -144,7 +289,8 @@ function SoloPlay() {
                     <h2>Play a round against the computer</h2>
                     <p>
                         You are East. Draw and discard against three AI opponents who use the
-                        same valuation engine. Claiming tiles from discards is coming next.
+                        same valuation engine. Claim Pong, Kong, Chow or a winning tile off
+                        their discards when the prompt appears.
                     </p>
                 </div>
                 <button className="primary-button" type="button" onClick={newGame} disabled={isBusy}>
@@ -160,6 +306,12 @@ function SoloPlay() {
                 </div>
             ) : (
                 <>
+                    {state.win && <WinSummary win={state.win} />}
+
+                    {state.awaiting_claim && state.claim && (
+                        <ClaimPrompt claim={state.claim} onClaim={claim} onPass={passClaim} disabled={isBusy} />
+                    )}
+
                     <section className="status-grid" aria-label="Game status" style={{ marginTop: 24 }}>
                         <article className="status-card">
                             <p className="eyebrow">Round wind</p>

@@ -760,3 +760,31 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Solo Play claim prompt and end-of-game summary */
+.claim-prompt {
+  border: 2px solid #d97706;
+  background: #fffbeb;
+}
+
+.win-summary {
+  border: 2px solid #16a34a;
+  background: #f0fdf4;
+}
+
+.tai-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.tai-breakdown td {
+  padding: 6px 4px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #444;
+}
+
+.tai-breakdown .tai-total td {
+  border-bottom: none;
+  border-top: 2px solid #16a34a;
+}

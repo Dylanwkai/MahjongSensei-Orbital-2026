@@ -684,6 +684,9 @@ class SoloGameTests(TestCase):
         guard = 0
         while game.result is None and guard < 500:
             guard += 1
+            if game.phase == "claim":
+                game.human_pass_claim()  # dumb human never claims
+                continue
             human = game.players[game.human_index()]
             tile = human.hand.tiles[0]
             game.human_discard(tile.suit, tile.value)
@@ -702,9 +705,12 @@ class SoloGameTests(TestCase):
         guard = 0
         while game.result is None and guard < 500:
             guard += 1
-            human = game.players[game.human_index()]
             for player in game.players:
                 self.assertTrue(all(not t.is_bonus for t in player.hand.tiles))
+            if game.phase == "claim":
+                game.human_pass_claim()
+                continue
+            human = game.players[game.human_index()]
             tile = human.hand.tiles[0]
             game.human_discard(tile.suit, tile.value)
 
@@ -735,6 +741,126 @@ class SoloGameTests(TestCase):
         )
         game.players[0].hand.tiles = winning
         self.assertTrue(game._is_winning(game.players[0]))
+
+    def _filler_13_with(self, *extra):
+        """A concealed hand of 13 tiles containing `extra`, padded with distinct
+        tiles that form no accidental sets."""
+        pad = tiles(
+            "B", 1, "B", 2, "B", 4, "B", 5, "B", 6,
+            "B", 7, "B", 8, "B", 9, "K", 1, "K", 2, "K", 4,
+        )
+        hand = list(extra) + pad
+        return hand[:13]
+
+    def test_human_can_claim_pong_off_a_discard(self):
+        game = SoloGame(human_seat="east")
+        game.players[0].hand.tiles = self._filler_13_with(*tiles("C", 3, "C", 3))
+
+        # South (an AI) discards a circles-3 the human holds two of.
+        game.current_index = 1
+        discard = Tile("circles", 3)
+        game.last_discard = discard
+        game.discards.append((1, discard))
+        game._open_claims()
+
+        self.assertEqual(game.phase, "claim")
+        self.assertIn("pong", game.pending_claim["options"]["actions"])
+
+        game.human_claim("pong")
+        self.assertEqual(game.current_index, 0)     # turn jumps to the claimer
+        self.assertEqual(game.phase, "discard")     # who must now discard
+        melds = game.players[0].hand.melds
+        self.assertTrue(any(m.kind == "pong" and m.claimed for m in melds))
+
+    def test_chow_is_only_offered_to_the_next_seat(self):
+        discard = Tile("circles", 3)
+
+        # North (index 3) discards, so East (the human, index 0) is next and may Chow.
+        game = SoloGame(human_seat="east")
+        game.players[0].hand.tiles = self._filler_13_with(*tiles("C", 4, "C", 5))
+        game.current_index = 3
+        game.last_discard = discard
+        game.discards.append((3, discard))
+        game._open_claims()
+        self.assertEqual(game.phase, "claim")
+        self.assertIn("chow", game.pending_claim["options"]["actions"])
+        self.assertIn(3, game.pending_claim["options"]["chow_runs"])
+
+        game.human_claim("chow", low_value=3)
+        self.assertEqual(game.current_index, 0)
+        self.assertTrue(any(m.kind == "chow" for m in game.players[0].hand.melds))
+
+        # If South (index 1) discards instead, the human is not next and cannot Chow.
+        game2 = SoloGame(human_seat="east")
+        game2.players[0].hand.tiles = self._filler_13_with(*tiles("C", 4, "C", 5))
+        game2.current_index = 1
+        game2.last_discard = discard
+        game2.discards.append((1, discard))
+        game2._open_claims()
+        # No claim was possible, so the turn simply advanced.
+        self.assertNotEqual(game2.phase, "claim")
+
+    def test_ai_auto_claims_an_honour_pong(self):
+        game = SoloGame(human_seat="east")
+        game.players[2].hand.tiles = self._filler_13_with(*tiles("H", "green", "H", "green"))
+
+        # South (index 1) discards a green dragon; West (index 2) wants the Pong.
+        game.current_index = 1
+        discard = Tile("honour", "green")
+        game.last_discard = discard
+        game.discards.append((1, discard))
+        game._open_claims()
+
+        self.assertNotEqual(game.phase, "claim")   # AI resolves without the human
+        self.assertEqual(game.current_index, 2)
+        self.assertTrue(any(m.kind == "pong" for m in game.players[2].hand.melds))
+
+    def test_ron_win_on_discard_is_detected_and_scored(self):
+        game = SoloGame(human_seat="east", round_wind="east")
+        # 234B, 666C, 789K, East pair, Red pair -> waiting on a third East.
+        game.players[0].hand.tiles = tiles(
+            "B", 2, "B", 3, "B", 4,
+            "C", 6, "C", 6, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "H", "east", "H", "east",
+            "H", "red", "H", "red",
+        )
+        game.current_index = 1  # South discards the winning East
+        discard = Tile("honour", "east")
+        game.last_discard = discard
+        game.discards.append((1, discard))
+        game._open_claims()
+
+        self.assertEqual(game.phase, "claim")
+        self.assertIn("win", game.pending_claim["options"]["actions"])
+
+        game.human_claim("win")
+        self.assertEqual(game.result, "win")
+        self.assertEqual(game.win_type, "ron")
+        self.assertEqual(game.winner_index, 0)
+        # East pong scores seat wind + round wind = 2 tai; with no bonus tiles
+        # there is nothing extra, so hand and total both come to 2.
+        self.assertTrue(game.win_score["is_valid_win"])
+        self.assertEqual(game.win_score["hand_tai"], 2)
+        self.assertEqual(game.win_score["total_tai"], 2)
+        labels = [row["label"] for row in game.win_score["breakdown"]]
+        self.assertTrue(any("Seat wind" in label for label in labels))
+
+    def test_self_draw_win_is_scored_in_public_state(self):
+        game = SoloGame(human_seat="east", round_wind="east")
+        game.players[0].hand.tiles = tiles(
+            "B", 2, "B", 3, "B", 4,
+            "C", 6, "C", 6, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "H", "east", "H", "east", "H", "east",
+            "H", "red", "H", "red",
+        )
+        game._declare_win(0, "self_draw", Tile("honour", "red"))
+        state = game.public_state()
+        self.assertIsNotNone(state["win"])
+        self.assertEqual(state["win"]["hand_tai"], 2)
+        self.assertEqual(state["win"]["win_type"], "self_draw")
+        self.assertTrue(len(state["win"]["breakdown"]) >= 1)
 
 
 class SoloApiTests(TestCase):
@@ -784,9 +910,11 @@ class SoloApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         # After discarding, the engine has run the AI seats and either returned
-        # to the human's turn or ended the game.
+        # to the human's turn, opened a claim window, or ended the game.
         self.assertTrue(
-            response.data["is_human_turn"] or response.data["result"] is not None
+            response.data["is_human_turn"]
+            or response.data["awaiting_claim"]
+            or response.data["result"] is not None
         )
 
 
@@ -842,6 +970,71 @@ class ScoreCalculatorTests(TestCase):
         self.assertIn("All Pongs", labels)
         self.assertEqual(score["hand_tai"], 6)
         self.assertTrue(score["is_valid_win"])
+
+    def _pinghu_hand(self):
+        # Four chows across two suits plus a characters pair (no flush, no
+        # winds): 123B 456B 123C 456C 55K.
+        return tiles(
+            "B", 1, "B", 2, "B", 3,
+            "B", 4, "B", 5, "B", 6,
+            "C", 1, "C", 2, "C", 3,
+            "C", 4, "C", 5, "C", 6,
+            "K", 5, "K", 5,
+        )
+
+    def test_pinghu_scores_four_tai_on_self_draw(self):
+        win = WinChecker().check(self._pinghu_hand())
+        score = ScoreCalculator("east", "east").score(win, [], win_type="self_draw")
+
+        labels = [item["label"] for item in score["breakdown"]]
+        self.assertIn("Pinghu", labels)
+        self.assertEqual(score["hand_tai"], 4)
+        self.assertTrue(score["is_valid_win"])
+
+    def test_pinghu_on_a_discard_needs_a_two_sided_wait(self):
+        win = WinChecker().check(self._pinghu_hand())
+
+        # Won on 6 bamboo, completing 456B from a 45 wait (2 or 5... i.e. 3/6):
+        # a two-sided wait, so Pinghu stands.
+        two_sided = ScoreCalculator("east", "east").score(
+            win, [], win_type="ron", winning_tile=Tile("bamboo", 6)
+        )
+        self.assertIn("Pinghu", [i["label"] for i in two_sided["breakdown"]])
+        self.assertEqual(two_sided["hand_tai"], 4)
+
+        # Won on 3 bamboo, completing 123B from a 12 edge wait (only a 3 works):
+        # one-sided, so no Pinghu and, with no other tai, not a valid win.
+        one_sided = ScoreCalculator("east", "east").score(
+            win, [], win_type="ron", winning_tile=Tile("bamboo", 3)
+        )
+        self.assertNotIn("Pinghu", [i["label"] for i in one_sided["breakdown"]])
+        self.assertEqual(one_sided["hand_tai"], 0)
+        self.assertFalse(one_sided["is_valid_win"])
+
+    def test_smelly_pinghu_scores_one_tai_and_keeps_flower(self):
+        win = WinChecker().check(self._pinghu_hand())
+        flower = Tile("flower", "red_1", is_bonus=True)  # East's seat flower
+        score = ScoreCalculator("east", "east").score(
+            win, [flower], win_type="self_draw"
+        )
+
+        labels = [item["label"] for item in score["breakdown"]]
+        self.assertIn("Smelly Pinghu", labels)
+        self.assertNotIn("Pinghu", labels)
+        self.assertEqual(score["hand_tai"], 1)   # smelly pinghu only
+        self.assertEqual(score["bonus_tai"], 1)  # the seat flower still counts
+        self.assertTrue(score["is_valid_win"])
+
+    def test_pinghu_not_awarded_without_win_context(self):
+        # The static score-hand path has no self-draw/Ron context, so Pinghu is
+        # not granted (and this clean all-chow hand is otherwise 0 tai).
+        win = WinChecker().check(self._pinghu_hand())
+        score = ScoreCalculator("east", "east").score(win, [])
+
+        labels = [item["label"] for item in score["breakdown"]]
+        self.assertNotIn("Pinghu", labels)
+        self.assertNotIn("Smelly Pinghu", labels)
+        self.assertFalse(score["is_valid_win"])
 
 
 class ScoreHandApiTests(TestCase):
