@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
 import TileCard from '../components/TileCard'
+import { useAuth } from '../context/AuthContext'
 
 function MeldRow({ melds }) {
     if (!melds || melds.length === 0) {
@@ -159,15 +160,75 @@ function WinSummary({ win }) {
     )
 }
 
+const REVEAL_DELAY = 1000  // ms between each revealed AI discard
+
 function SoloPlay() {
+    const { refreshProfile } = useAuth()
     const [state, setState] = useState(null)
     const [error, setError] = useState('')
     const [isBusy, setIsBusy] = useState(false)
+    const [hint, setHint] = useState(null)
+
+    // How many discards are currently revealed. When a move produces several AI
+    // discards at once, we reveal them one at a time (see commitState).
+    const [revealCount, setRevealCount] = useState(0)
+    const revealCountRef = useRef(0)
+    const revealTimer = useRef(null)
+
+    const setReveal = useCallback((n) => {
+        revealCountRef.current = n
+        setRevealCount(n)
+    }, [])
+
+    const clearRevealTimer = useCallback(() => {
+        if (revealTimer.current) {
+            clearTimeout(revealTimer.current)
+            revealTimer.current = null
+        }
+    }, [])
+
+    // Store the new game state. When animate is true and the discard pile grew,
+    // reveal the new discards one by one with a short delay between each so the
+    // AI seats appear to play in turn rather than all at once.
+    const commitState = useCallback((data, animate) => {
+        setHint(null)  // any hint is stale once the table changes
+        setState((prev) => {
+            if (data?.result && (!prev || !prev.result)) {
+                refreshProfile()
+            }
+            return data
+        })
+
+        clearRevealTimer()
+        const total = data?.discards?.length || 0
+
+        if (!animate || total <= revealCountRef.current) {
+            setReveal(total)
+            return
+        }
+
+        // Show the first new discard (the player's own) immediately, then step
+        // through the rest.
+        setReveal(revealCountRef.current + 1)
+        const tick = () => {
+            if (revealCountRef.current >= total) {
+                revealTimer.current = null
+                return
+            }
+            revealTimer.current = setTimeout(() => {
+                setReveal(revealCountRef.current + 1)
+                tick()
+            }, REVEAL_DELAY)
+        }
+        tick()
+    }, [refreshProfile, clearRevealTimer, setReveal])
+
+    useEffect(() => clearRevealTimer, [clearRevealTimer])
 
     const loadState = useCallback(async () => {
         try {
             const response = await api.get('/api/game/solo/state/')
-            setState(response.data)
+            commitState(response.data, false)
         } catch (err) {
             if (err.response?.status === 404) {
                 setState(null) // no game yet
@@ -175,7 +236,7 @@ function SoloPlay() {
                 setError('Could not load the game.')
             }
         }
-    }, [])
+    }, [commitState])
 
     useEffect(() => {
         loadState()
@@ -186,7 +247,7 @@ function SoloPlay() {
         setError('')
         try {
             const response = await api.post('/api/game/solo/new/')
-            setState(response.data)
+            commitState(response.data, false)
         } catch (err) {
             setError('Could not start a new game.')
         } finally {
@@ -202,7 +263,7 @@ function SoloPlay() {
                 suit: tile.suit,
                 value: tile.value,
             })
-            setState(response.data)
+            commitState(response.data, true)
         } catch (err) {
             setError(err.response?.data?.error || 'Could not discard that tile.')
         } finally {
@@ -218,7 +279,7 @@ function SoloPlay() {
                 suit: tile.suit,
                 value: tile.value,
             })
-            setState(response.data)
+            commitState(response.data, false)
         } catch (err) {
             setError(err.response?.data?.error || 'Could not declare a Kong.')
         } finally {
@@ -235,7 +296,7 @@ function SoloPlay() {
                 body.low_value = lowValue
             }
             const response = await api.post('/api/game/solo/claim/', body)
-            setState(response.data)
+            commitState(response.data, true)
         } catch (err) {
             setError(err.response?.data?.error || 'Could not make that claim.')
         } finally {
@@ -248,11 +309,21 @@ function SoloPlay() {
         setError('')
         try {
             const response = await api.post('/api/game/solo/pass/')
-            setState(response.data)
+            commitState(response.data, true)
         } catch (err) {
             setError(err.response?.data?.error || 'Could not pass.')
         } finally {
             setIsBusy(false)
+        }
+    }
+
+    const requestHint = async () => {
+        setError('')
+        try {
+            const response = await api.get('/api/game/solo/hint/')
+            setHint(response.data)
+        } catch (err) {
+            setError(err.response?.data?.error || 'Could not get a hint.')
         }
     }
 
@@ -279,7 +350,18 @@ function SoloPlay() {
         return Object.values(counts).filter((entry) => entry.n === 4).map((e) => e.tile)
     }, [human])
 
-    const yourTurn = state && state.is_human_turn && !state.result
+    // Tiles the hint suggests discarding, for highlighting in the hand.
+    const hintKeys = useMemo(() => {
+        const list = hint?.optimal_discards || (hint?.discard ? [hint.discard] : [])
+        return new Set(list.map((tile) => `${tile.suit}-${tile.value}`))
+    }, [hint])
+
+    // While AI discards are still being revealed one by one, hold back the
+    // player's controls, the claim prompt and the win summary.
+    const revealing = Boolean(state && revealCount < state.discards.length)
+    const revealedDiscards = state ? state.discards.slice(0, revealCount) : []
+    const yourTurn = state && state.is_human_turn && !state.result && !revealing
+    const locked = isBusy || revealing
 
     return (
         <AppLayout>
@@ -306,11 +388,7 @@ function SoloPlay() {
                 </div>
             ) : (
                 <>
-                    {state.win && <WinSummary win={state.win} />}
-
-                    {state.awaiting_claim && state.claim && (
-                        <ClaimPrompt claim={state.claim} onClaim={claim} onPass={passClaim} disabled={isBusy} />
-                    )}
+                    {state.win && !revealing && <WinSummary win={state.win} />}
 
                     <section className="status-grid" aria-label="Game status" style={{ marginTop: 24 }}>
                         <article className="status-card">
@@ -347,12 +425,15 @@ function SoloPlay() {
                         <div className="panel-heading">
                             <div>
                                 <p className="eyebrow">Latest discards</p>
-                                <h3>{state.discards.length} discarded</h3>
+                                <h3>
+                                    {revealedDiscards.length} discarded
+                                    {revealing ? ' · opponents playing…' : ''}
+                                </h3>
                             </div>
                         </div>
-                        {state.discards.length > 0 ? (
+                        {revealedDiscards.length > 0 ? (
                             <div className="meld-row">
-                                {state.discards.slice(-12).map((entry, i) => (
+                                {revealedDiscards.slice(-12).map((entry, i) => (
                                     <TileCard key={`${entry.tile.code}-${i}`} tile={entry.tile} size="sm" />
                                 ))}
                             </div>
@@ -362,6 +443,10 @@ function SoloPlay() {
                             </div>
                         )}
                     </section>
+
+                    {state.awaiting_claim && state.claim && !revealing && (
+                        <ClaimPrompt claim={state.claim} onClaim={claim} onPass={passClaim} disabled={isBusy} />
+                    )}
 
                     <section className="tile-picker-panel" style={{ marginTop: 24 }}>
                         <div className="panel-heading">
@@ -375,23 +460,52 @@ function SoloPlay() {
                                             : 'Waiting…'}
                                 </h3>
                             </div>
+                            {yourTurn && (
+                                <button
+                                    className="secondary-button"
+                                    type="button"
+                                    onClick={requestHint}
+                                    disabled={locked}
+                                >
+                                    Hint
+                                </button>
+                            )}
                         </div>
+
+                        {hint && (
+                            <div className="hint-banner">
+                                <span className="eyebrow">Suggested discard</span>
+                                <div className="meld-row" style={{ flexWrap: 'wrap' }}>
+                                    {(hint.optimal_discards || [hint.discard]).map((tile, i) => (
+                                        <TileCard key={`hint-${tile.code}-${i}`} tile={tile} size="sm" />
+                                    ))}
+                                </div>
+                                {(hint.optimal_discards?.length || 1) > 1 && (
+                                    <p style={{ margin: 0, color: '#666', fontSize: '0.85rem' }}>
+                                        Any of these is an equally strong discard.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <MeldRow melds={human?.melds} />
 
                         <div className="picker-grid" style={{ marginTop: human?.melds?.length ? 12 : 0 }}>
-                            {(human?.tiles || []).map((tile, i) => (
+                            {(human?.tiles || []).map((tile, i) => {
+                                const isHinted = yourTurn && hintKeys.has(`${tile.suit}-${tile.value}`)
+                                return (
                                 <button
                                     key={`${tile.code}-${i}`}
-                                    className={`tile picker-tile tile-${tile.suit}`}
+                                    className={`tile picker-tile tile-${tile.suit}${isHinted ? ' hint-tile' : ''}`}
                                     type="button"
                                     onClick={() => discard(tile)}
-                                    disabled={!yourTurn || isBusy}
+                                    disabled={!yourTurn || locked}
                                 >
                                     <span className="tile-code">{tile.code}</span>
                                     <span className="tile-label">{tile.label}</span>
                                 </button>
-                            ))}
+                                )
+                            })}
                         </div>
 
                         {kongable.length > 0 && yourTurn && (
@@ -404,7 +518,7 @@ function SoloPlay() {
                                             className="secondary-button"
                                             type="button"
                                             onClick={() => declareKong(tile)}
-                                            disabled={isBusy}
+                                            disabled={locked}
                                         >
                                             Kong {tile.label}
                                         </button>
@@ -427,11 +541,15 @@ function SoloPlay() {
 
                     <section className="tile-picker-panel" style={{ marginTop: 24 }}>
                         <p className="eyebrow">Game log</p>
-                        <ul style={{ margin: 0, paddingLeft: 18, color: '#666', lineHeight: 1.7 }}>
-                            {state.log.map((line, i) => (
-                                <li key={i}>{line}</li>
-                            ))}
-                        </ul>
+                        {revealing ? (
+                            <p style={{ margin: 0, color: '#888' }}>Opponents are playing…</p>
+                        ) : (
+                            <ul style={{ margin: 0, paddingLeft: 18, color: '#666', lineHeight: 1.7 }}>
+                                {state.log.map((line, i) => (
+                                    <li key={i}>{line}</li>
+                                ))}
+                            </ul>
+                        )}
                     </section>
                 </>
             )}

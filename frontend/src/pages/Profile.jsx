@@ -31,9 +31,8 @@ function Profile() {
                     <p className="eyebrow">Player profile</p>
                     <h2>{profile?.username || 'MahjongSensei player'}</h2>
                     <p>
-                        This page is the foundation for the later dashboard. Right now it
-                        proves that authenticated user data can be read from Django and shown
-                        in React.
+                        Your play record, updated automatically after every Solo Play game.
+                        Finish a round to see your games played, wins and win rate change.
                     </p>
                 </div>
                 <button className="primary-button" onClick={handleRefresh} disabled={isRefreshing}>
@@ -62,8 +61,8 @@ function Profile() {
 
             <section className="stats-panel">
                 <div className="section-heading">
-                    <p className="eyebrow">Stats tracker base</p>
-                    <h2>Ready for future play history</h2>
+                    <p className="eyebrow">Solo Play record</p>
+                    <h2>Your game history</h2>
                 </div>
                 <div className="stats-grid">
                     <article>
