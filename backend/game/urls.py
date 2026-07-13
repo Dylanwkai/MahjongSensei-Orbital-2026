@@ -7,6 +7,7 @@ from .views import (
     ScoreHandView,
     SoloClaimView,
     SoloDiscardView,
+    SoloHintView,
     SoloKongView,
     SoloNewView,
     SoloPassView,
@@ -30,4 +31,5 @@ urlpatterns = [
     path('solo/kong/', SoloKongView.as_view(), name='solo-kong'),
     path('solo/claim/', SoloClaimView.as_view(), name='solo-claim'),
     path('solo/pass/', SoloPassView.as_view(), name='solo-pass'),
+    path('solo/hint/', SoloHintView.as_view(), name='solo-hint'),
 ]

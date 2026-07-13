@@ -270,14 +270,33 @@ def tile_sort_key(tile):
     return (suit_order[tile.suit], value)
 
 
+# Trainer difficulty: how many complete melds (and a pair) to seed into a dealt
+# hand. More seeded groups means the hand starts closer to a win, so an easy
+# hand has an obvious discard while a hard hand is mostly loose tiles.
+DIFFICULTY_PROFILES = {
+    "easy": {"melds": 3, "pair": True},
+    "medium": {"melds": 2, "pair": True},
+    "hard": {"melds": 1, "pair": False},
+}
+
+
 class HandGenerator:
-    def generate_random_hand(self, hand_size=13):
+    def generate_random_hand(self, hand_size=13, difficulty=None):
+        """Deal a hand. With no difficulty the tiles are drawn purely at random.
+        With a difficulty ('easy'/'medium'/'hard') the hand is seeded with a
+        number of complete melds so it starts closer to (or further from) a
+        winning shape."""
+        if difficulty in DIFFICULTY_PROFILES:
+            return self._structured_hand(hand_size, DIFFICULTY_PROFILES[difficulty])
+        return self._random_hand(hand_size)
+
+    def _random_hand(self, hand_size):
         deck = Deck()
         deck.shuffle()
-        
+
         tiles = []
         bonus_tiles = []
-        
+
         # Bonus tiles are replaced immediately, so the playable hand stays full.
         while len(tiles) < hand_size:
             drawn = deck.draw()
@@ -285,10 +304,86 @@ class HandGenerator:
                 bonus_tiles.append(drawn)
             else:
                 tiles.append(drawn)
-        
+
         hand = Hand(tiles)
         hand.bonus_tiles = bonus_tiles
         return hand
+
+    def _structured_hand(self, hand_size, profile):
+        pool = self._fresh_pool()
+        keys = []
+
+        for _ in range(profile["melds"]):
+            meld = self._draw_meld(pool)
+            if meld is None:
+                break
+            keys.extend(meld)
+
+        if profile.get("pair"):
+            pair = self._draw_pair(pool)
+            if pair:
+                keys.extend(pair)
+
+        # Top up with loose tiles until the hand is full.
+        while len(keys) < hand_size:
+            keys.append(self._draw_single(pool))
+
+        keys = keys[:hand_size]
+        tiles = [Tile(suit, value) for suit, value in keys]
+        random.shuffle(tiles)
+
+        hand = Hand(tiles)
+        hand.bonus_tiles = []
+        return hand
+
+    @staticmethod
+    def _fresh_pool():
+        pool = Counter()
+        for suit in NUMBERED_SUITS:
+            for value in range(1, 10):
+                pool[(suit, value)] = 4
+        for value in HONOUR_VALUES:
+            pool[("honour", value)] = 4
+        return pool
+
+    def _draw_meld(self, pool):
+        """Take a random Pong or Chow out of the pool, respecting tile counts."""
+        for kind in random.sample(("pong", "chow"), 2):
+            if kind == "pong":
+                candidates = [key for key, count in pool.items() if count >= 3]
+                if candidates:
+                    key = random.choice(candidates)
+                    pool[key] -= 3
+                    return [key, key, key]
+            else:
+                runs = []
+                for suit in NUMBERED_SUITS:
+                    for low in range(1, 8):
+                        run = [(suit, low), (suit, low + 1), (suit, low + 2)]
+                        if all(pool[key] >= 1 for key in run):
+                            runs.append(run)
+                if runs:
+                    run = random.choice(runs)
+                    for key in run:
+                        pool[key] -= 1
+                    return run
+        return None
+
+    @staticmethod
+    def _draw_pair(pool):
+        candidates = [key for key, count in pool.items() if count >= 2]
+        if not candidates:
+            return None
+        key = random.choice(candidates)
+        pool[key] -= 2
+        return [key, key]
+
+    @staticmethod
+    def _draw_single(pool):
+        candidates = [key for key, count in pool.items() if count >= 1]
+        key = random.choice(candidates)
+        pool[key] -= 1
+        return key
 
 
 class HandEvaluator:
@@ -393,6 +488,29 @@ class ValuationAlgorithm:
                 "combination of sets, pairs, and near-sequences."
             ),
         }
+
+    def optimal_discards(self, hand):
+        """Every distinct discard that ties for the best resulting hand score.
+        Several tiles can be equally good, so this returns all of them (not just
+        the first one found)."""
+        best_score = None
+        scored = {}  # (suit, value) -> (Tile, score), deduped across copies
+
+        for tile in hand.sorted_tiles():
+            key = (tile.suit, tile.value)
+            if key in scored:
+                continue
+            remaining = hand.tiles.copy()
+            remaining.remove(tile)
+            score = self.evaluator.evaluate_hand(remaining)
+            scored[key] = (tile, score)
+            if best_score is None or score > best_score:
+                best_score = score
+
+        discards = [
+            tile.to_dict() for tile, score in scored.values() if score == best_score
+        ]
+        return {"discards": discards, "score": best_score}
 
 
 # Thirteen Orphans: one of every terminal (1 and 9 in each suit) and every

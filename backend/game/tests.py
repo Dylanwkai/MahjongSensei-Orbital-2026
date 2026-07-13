@@ -1,3 +1,5 @@
+from collections import Counter
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -44,6 +46,32 @@ class MahjongEngineTests(TestCase):
 
         self.assertTrue(all(tile.is_bonus for tile in hand.bonus_tiles))
         self.assertEqual(hand.to_dict()["tile_count"], 13)
+
+    def test_difficulty_controls_closeness_to_winning(self):
+        from statistics import mean
+
+        generator = HandGenerator()
+        evaluator = HandEvaluator()
+
+        def average_strength(difficulty, samples=120):
+            scores = []
+            for _ in range(samples):
+                hand = generator.generate_random_hand(hand_size=14, difficulty=difficulty)
+                self.assertEqual(len(hand.tiles), 14)
+                # No more than four of any tile is dealt.
+                counts = Counter((t.suit, t.value) for t in hand.tiles)
+                self.assertTrue(all(c <= 4 for c in counts.values()))
+                scores.append(evaluator.evaluate_hand(hand.tiles))
+            return mean(scores)
+
+        easy = average_strength("easy")
+        medium = average_strength("medium")
+        hard = average_strength("hard")
+
+        # Easier hands are seeded with more complete melds, so they sit closer
+        # to a winning shape on average.
+        self.assertGreater(easy, medium)
+        self.assertGreater(medium, hard)
 
     def test_tile_serializes_for_api_response(self):
         tile = Tile("bamboo", 3)
@@ -115,6 +143,38 @@ class MahjongEngineTests(TestCase):
 
         self.assertIn(recommendation["discard"]["code"], ["B9", "C1"])
         self.assertIn("reasoning", recommendation)
+
+    def test_optimal_discards_returns_every_tied_best(self):
+        # Three finished melds and a pair, plus three unconnected singletons:
+        # discarding any one of those singletons is equally optimal.
+        hand = Hand([
+            Tile("bamboo", 1),
+            Tile("bamboo", 2),
+            Tile("bamboo", 3),
+            Tile("circles", 4),
+            Tile("circles", 5),
+            Tile("circles", 6),
+            Tile("characters", 7),
+            Tile("characters", 8),
+            Tile("characters", 9),
+            Tile("bamboo", 5),
+            Tile("bamboo", 5),
+            Tile("honour", "east"),
+            Tile("honour", "west"),
+            Tile("circles", 1),
+        ])
+
+        result = ValuationAlgorithm().optimal_discards(hand)
+        codes = sorted(tile["code"] for tile in result["discards"])
+
+        # More than one discard ties for the best score.
+        self.assertGreater(len(result["discards"]), 1)
+        self.assertEqual(codes, ["C1", "Heast", "Hwest"])
+        # The single-recommendation helper returns one of the optimal tiles.
+        single = ValuationAlgorithm().recommend_discard(hand)
+        self.assertIn(single["discard"]["code"], codes)
+        # No tile type is listed twice.
+        self.assertEqual(len(codes), len(set(codes)))
 
 
 class RandomHandApiTests(TestCase):
@@ -916,6 +976,38 @@ class SoloApiTests(TestCase):
             or response.data["awaiting_claim"]
             or response.data["result"] is not None
         )
+
+    def test_finished_solo_game_updates_profile(self):
+        from users.models import Profile
+
+        from .views import _record_solo_result
+
+        Profile.objects.get_or_create(user=self.user)
+
+        # A human win: one game played, one won.
+        game = SoloGame(human_seat="east")
+        game.result = "win"
+        game.winner_index = game.human_index()
+        _record_solo_result(self.user, game)
+
+        profile = Profile.objects.get(user=self.user)
+        self.assertEqual(profile.games_played, 1)
+        self.assertEqual(profile.games_won, 1)
+        self.assertEqual(profile.win_rate, 100.0)
+
+        # Recording the same finished game again must not double count.
+        _record_solo_result(self.user, game)
+        profile.refresh_from_db()
+        self.assertEqual(profile.games_played, 1)
+
+        # A washout counts as a game played but not won.
+        washout = SoloGame(human_seat="east")
+        washout.result = "washout"
+        _record_solo_result(self.user, washout)
+        profile.refresh_from_db()
+        self.assertEqual(profile.games_played, 2)
+        self.assertEqual(profile.games_won, 1)
+        self.assertEqual(profile.win_rate, 50.0)
 
 
 class ScoreCalculatorTests(TestCase):
