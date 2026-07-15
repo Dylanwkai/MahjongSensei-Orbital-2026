@@ -68,10 +68,6 @@ function Home() {
                         so the advice you learn from is the same logic you play against.
                     </p>
                 </div>
-                <div className="hero-status">
-                    <span className="status-dot" aria-hidden="true" />
-                    Backend connected
-                </div>
             </section>
 
             <section className="feature-grid" aria-label="Features">
