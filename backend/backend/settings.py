@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 import os
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'users',
     'game',
@@ -152,4 +154,25 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+}
+
+# Token lifetimes and rotation. Without this block SimpleJWT defaults to a
+# 5-minute access token and a 1-day refresh token with no rotation, which is
+# what caused users to be logged out mid-session.
+#
+# - The short-lived ACCESS token is what every API request carries; keeping it
+#   short limits the damage if one leaks (it expires before it can be abused).
+# - The long-lived REFRESH token is only ever sent to /api/token/refresh/ to
+#   mint a new access token, so a session survives as long as the user comes
+#   back within its lifetime.
+# - ROTATE_REFRESH_TOKENS issues a fresh refresh token on every refresh call,
+#   so an active user's session extends indefinitely (a "sliding" session).
+# - BLACKLIST_AFTER_ROTATION invalidates the old refresh token once rotated,
+#   so a stolen old token cannot be replayed. Requires the token_blacklist
+#   app (added to INSTALLED_APPS) and a `manage.py migrate`.
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }

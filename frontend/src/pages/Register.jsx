@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { LogoMark } from '../components/Logo'
 
 function Register() {
     const [username, setUsername] = useState('')
@@ -26,8 +27,12 @@ function Register() {
     return (
         <div className="auth-page">
             <section className="auth-card">
-                <p className="eyebrow">MahjongSensei</p>
-                <h2>Register</h2>
+                <div className="auth-brand">
+                    <LogoMark />
+                    <p className="eyebrow">MahjongSensei</p>
+                </div>
+                <h2>Create your account</h2>
+                <p className="auth-sub">Learn Singapore Mahjong from zero, one decision at a time.</p>
                 {error && <p className="error-message">{error}</p>}
                 <form className="auth-form" onSubmit={handleSubmit}>
                     <label htmlFor="register-username">Username</label>
@@ -49,7 +54,7 @@ function Register() {
                     />
                     <button className="primary-button" type="submit">Register</button>
                 </form>
-                <p>Already have an account? <Link to="/login">Login</Link></p>
+                <p className="auth-switch">Already have an account? <Link to="/login">Login</Link></p>
             </section>
         </div>
     )

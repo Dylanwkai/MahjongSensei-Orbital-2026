@@ -1,8 +1,40 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
 import HandDisplay from '../components/HandDisplay'
+
+const FEATURES = [
+    {
+        to: '/tutorial',
+        glyph: '學',
+        title: 'Tutorial',
+        body: 'Learn the tiles, melds and winning hands with short visual lessons and quizzes.',
+        cta: 'Start learning →',
+    },
+    {
+        to: '/hand-helper',
+        glyph: '思',
+        title: 'Hand Helper',
+        body: 'Build any 14-tile hand and see exactly which tile to discard, and why.',
+        cta: 'Analyse a hand →',
+    },
+    {
+        to: '/trainer',
+        glyph: '練',
+        title: 'Trainer',
+        body: 'Drill your discard decisions against the engine and track your accuracy.',
+        cta: 'Practise now →',
+    },
+    {
+        to: '/solo',
+        glyph: '戰',
+        title: 'Solo Play',
+        body: 'Play a full round against three AI opponents, with claims, kongs and tai scoring.',
+        cta: 'Play a game →',
+    },
+]
 
 function Home() {
     const { user, profile } = useAuth()
@@ -31,9 +63,9 @@ function Home() {
                     <p className="eyebrow">Welcome back, {user || 'player'}</p>
                     <h2>Build Mahjong understanding one decision at a time.</h2>
                     <p>
-                        This base app now has authentication, protected routes, a profile-backed
-                        session, and a backend-powered Mahjong hand generator. The next features
-                        can plug into this structure instead of starting from scratch.
+                        Learn the rules, test your discards, and play full rounds against
+                        the computer — every feature is powered by the same Mahjong engine,
+                        so the advice you learn from is the same logic you play against.
                     </p>
                 </div>
                 <div className="hero-status">
@@ -42,44 +74,55 @@ function Home() {
                 </div>
             </section>
 
-            <section className="status-grid" aria-label="Project status">
-                <article className="status-card">
-                    <p className="eyebrow">Current user</p>
-                    <strong>{profile?.username || user || 'Player'}</strong>
-                    <span>JWT session active</span>
-                </article>
+            <section className="feature-grid" aria-label="Features">
+                {FEATURES.map((feature) => (
+                    <Link key={feature.to} to={feature.to} className="feature-card">
+                        <span className="feature-glyph" aria-hidden="true">{feature.glyph}</span>
+                        <h3>{feature.title}</h3>
+                        <p>{feature.body}</p>
+                        <span className="feature-cta">{feature.cta}</span>
+                    </Link>
+                ))}
+            </section>
+
+            <section className="status-grid" aria-label="Your record" style={{ marginTop: 24 }}>
                 <article className="status-card">
                     <p className="eyebrow">Games played</p>
                     <strong>{profile?.games_played ?? 0}</strong>
-                    <span>Ready for dashboard tracking</span>
+                    <span>Solo Play rounds finished</span>
                 </article>
                 <article className="status-card">
-                    <p className="eyebrow">Milestone 1</p>
-                    <strong>Proof ready</strong>
-                    <span>React + Django + Python engine</span>
+                    <p className="eyebrow">Games won</p>
+                    <strong>{profile?.games_won ?? 0}</strong>
+                    <span>Wins recorded on your profile</span>
+                </article>
+                <article className="status-card">
+                    <p className="eyebrow">Win rate</p>
+                    <strong>{profile?.win_rate ?? 0}%</strong>
+                    <span>Updated after every game</span>
                 </article>
             </section>
 
             <section className="demo-layout">
                 <section className="demo-copy">
-                    <p className="eyebrow">Technical proof</p>
-                    <h2>Generate a Mahjong hand from Django</h2>
+                    <p className="eyebrow">Warm up</p>
+                    <h2>Deal a practice hand</h2>
                     <p>
-                        This page proves the React frontend can call the Django API,
-                        pass authentication, run Python Mahjong logic, and render the
-                        result in the browser.
+                        Not sure where to start? Deal yourself a random hand and study its
+                        shape — then take it to the Hand Helper to see what the engine
+                        would keep.
                     </p>
                     <button className="primary-button" onClick={generateHand} disabled={isLoading}>
-                        {isLoading ? 'Generating...' : 'Generate Hand'}
+                        {isLoading ? 'Dealing…' : 'Deal a hand'}
                     </button>
                     {error && <p className="error-message">{error}</p>}
                 </section>
 
-                <section className="hand-panel" aria-label="Generated Mahjong hand">
+                <section className="hand-panel felt-panel" aria-label="Generated Mahjong hand">
                     <div className="panel-heading">
                         <div>
                             <p className="eyebrow">Random hand</p>
-                            <h3>{hand ? `${hand.tile_count} playable tiles` : 'No hand generated yet'}</h3>
+                            <h3>{hand ? `${hand.tile_count} playable tiles` : 'No hand dealt yet'}</h3>
                         </div>
                         {hand && hand.bonus_count > 0 && (
                             <span className="bonus-count">{hand.bonus_count} bonus drawn</span>
@@ -94,7 +137,7 @@ function Home() {
                         />
                     ) : (
                         <div className="empty-state">
-                            <p>Click generate to request a hand from Django.</p>
+                            <p>Deal a hand to see the tiles land on the felt.</p>
                         </div>
                     )}
                 </section>

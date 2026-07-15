@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
-import TileCard from '../components/TileCard'
+import TileCard, { TileFace } from '../components/TileCard'
 import { useAuth } from '../context/AuthContext'
 
 function MeldRow({ melds }) {
@@ -421,7 +421,7 @@ function SoloPlay() {
                         </div>
                     </section>
 
-                    <section className="tile-picker-panel" style={{ marginTop: 24 }}>
+                    <section className="tile-picker-panel felt-panel" style={{ marginTop: 24 }}>
                         <div className="panel-heading">
                             <div>
                                 <p className="eyebrow">Latest discards</p>
@@ -448,7 +448,7 @@ function SoloPlay() {
                         <ClaimPrompt claim={state.claim} onClaim={claim} onPass={passClaim} disabled={isBusy} />
                     )}
 
-                    <section className="tile-picker-panel" style={{ marginTop: 24 }}>
+                    <section className="tile-picker-panel felt-panel" style={{ marginTop: 24 }}>
                         <div className="panel-heading">
                             <div>
                                 <p className="eyebrow">Your hand (East)</p>
@@ -500,9 +500,9 @@ function SoloPlay() {
                                     type="button"
                                     onClick={() => discard(tile)}
                                     disabled={!yourTurn || locked}
+                                    title={tile.label}
                                 >
-                                    <span className="tile-code">{tile.code}</span>
-                                    <span className="tile-label">{tile.label}</span>
+                                    <TileFace tile={tile} />
                                 </button>
                                 )
                             })}
@@ -544,7 +544,7 @@ function SoloPlay() {
                         {revealing ? (
                             <p style={{ margin: 0, color: '#888' }}>Opponents are playing…</p>
                         ) : (
-                            <ul style={{ margin: 0, paddingLeft: 18, color: '#666', lineHeight: 1.7 }}>
+                            <ul className="game-log">
                                 {state.log.map((line, i) => (
                                     <li key={i}>{line}</li>
                                 ))}

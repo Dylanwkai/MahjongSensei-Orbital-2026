@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
+import TileCard, { TileFace } from '../components/TileCard'
 
 const NUMBERED_SUITS = [
     { suit: 'bamboo', label: 'Bamboo', code: 'B' },
@@ -38,9 +39,9 @@ function TileButton({ tile, count, onClick, disabled }) {
             type="button"
             onClick={() => onClick(tile)}
             disabled={disabled}
+            title={tile.label}
         >
-            <span className="tile-code">{tile.code}</span>
-            <span className="tile-label">{tile.label}</span>
+            <TileFace tile={tile} />
             {count > 0 && <span className="tile-count">{count}/4</span>}
         </button>
     )
@@ -49,13 +50,13 @@ function TileButton({ tile, count, onClick, disabled }) {
 function SelectedTile({ tile, onRemove }) {
     return (
         <button
-            className={`tile selected-tile tile-${tile.suit}`}
+            className={`tile tile-${tile.suit}`}
             type="button"
             onClick={onRemove}
             aria-label={`Remove ${tile.label}`}
+            title={`Remove ${tile.label}`}
         >
-            <span className="tile-code">{tile.code}</span>
-            <span className="tile-label">{tile.label}</span>
+            <TileFace tile={tile} />
         </button>
     )
 }
@@ -66,14 +67,6 @@ function HandHelper() {
     const [error, setError] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [winResult, setWinResult] = useState(null)
-
-    const tileOptions = useMemo(() => {
-        const suitedTiles = NUMBERED_SUITS.flatMap(({ suit, code }) => (
-            Array.from({ length: 9 }, (_, index) => buildTileOption(suit, index + 1, code))
-        ))
-
-        return [...suitedTiles, ...HONOUR_TILES]
-    }, [])
 
     const tileCounts = useMemo(() => {
         return selectedTiles.reduce((counts, tile) => {
@@ -228,7 +221,7 @@ function HandHelper() {
                     </div>
                 </section>
 
-                <section className="helper-result-panel">
+                <section className="helper-result-panel felt-panel">
                     <div className="panel-heading">
                         <div>
                             <p className="eyebrow">Current hand</p>
@@ -256,15 +249,7 @@ function HandHelper() {
                     )}
 
                     {winResult?.is_winning && (
-                        <section
-                            className="recommendation-panel"
-                            aria-label="Winning hand"
-                            style={{
-                                borderColor: '#22c55e',
-                                background: 'rgba(34, 197, 94, 0.12)',
-                                marginTop: '1rem',
-                            }}
-                        >
+                        <section className="win-banner" aria-label="Winning hand">
                             <p className="eyebrow">🎉 Winning hand!</p>
                             <h3>{winResult.description}</h3>
                             <p>
@@ -290,10 +275,7 @@ function HandHelper() {
                         <section className="recommendation-panel" aria-label="Discard recommendation">
                             <p className="eyebrow">Recommended discard</p>
                             <div className="recommendation-content">
-                                <div className={`tile tile-${recommendation.discard.suit}`}>
-                                    <span className="tile-code">{recommendation.discard.code}</span>
-                                    <span className="tile-label">{recommendation.discard.label}</span>
-                                </div>
+                                <TileCard tile={recommendation.discard} size="lg" />
                                 <div>
                                     <h3>{recommendation.discard.label}</h3>
                                     <p>{recommendation.reasoning}</p>

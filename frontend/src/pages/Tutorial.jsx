@@ -204,27 +204,17 @@ function LessonView({ lesson }) {
             )}
 
             {lesson.tiles && (
-                <ul className="tile-grid">
+                <div className="tile-grid">
                     {lesson.tiles.map((tile, index) => (
-                        <li key={`${tile.code}-${index}`} className={`tile tile-${tile.suit}`}>
-                            <span className="tile-code">{tile.code}</span>
-                            <span className="tile-label">{tile.label}</span>
-                        </li>
+                        <TileCard key={`${tile.code}-${index}`} tile={tile} />
                     ))}
-                </ul>
+                </div>
             )}
 
             {lesson.groups && (
-                <div
-                    className="meld-group-row"
-                    style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.75rem' }}
-                >
+                <div className="meld-group-row">
                     {lesson.groups.map((group, gi) => (
-                        <div
-                            key={gi}
-                            className="meld-tile-row"
-                            style={{ display: 'flex', gap: '0.35rem' }}
-                        >
+                        <div key={gi} className="meld-tile-row">
                             {group.map((tile, ti) => (
                                 <TileCard key={`${tile.code}-${ti}`} tile={tile} />
                             ))}
@@ -329,36 +319,14 @@ function Tutorial() {
                     <section className="feature-grid" aria-label="Tutorial modules">
                         {modules.map((module) => (
                             <article key={module.id} className="feature-card module-card">
-                                <div
-                                    className="module-card-head"
-                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}
-                                >
+                                <div className="module-card-head">
                                     <h3>{module.title}</h3>
                                     {module.completed && (
-                                        <span
-                                            className="module-tick"
-                                            aria-label="Completed"
-                                            style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                width: '1.6rem',
-                                                height: '1.6rem',
-                                                borderRadius: '50%',
-                                                background: '#22c55e',
-                                                color: '#fff',
-                                                fontWeight: 700,
-                                            }}
-                                        >
-                                            ✓
-                                        </span>
+                                        <span className="module-tick" aria-label="Completed">✓</span>
                                     )}
                                 </div>
                                 <p>{module.description}</p>
-                                <div
-                                    className="module-card-foot"
-                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1rem' }}
-                                >
+                                <div className="module-card-foot">
                                     {module.completed ? (
                                         <span className="module-status">
                                             Completed{module.quiz_score != null
@@ -421,25 +389,10 @@ function Tutorial() {
                 </button>
             </section>
 
-            <div
-                className="tutorial-progress-bar"
-                aria-hidden="true"
-                style={{
-                    height: '8px',
-                    borderRadius: '999px',
-                    background: 'rgba(148, 163, 184, 0.25)',
-                    overflow: 'hidden',
-                    margin: '0 0 1.25rem',
-                }}
-            >
+            <div className="tutorial-progress-bar" aria-hidden="true">
                 <div
                     className="tutorial-progress-fill"
-                    style={{
-                        width: `${progressPct}%`,
-                        height: '100%',
-                        background: '#6366f1',
-                        transition: 'width 0.25s ease',
-                    }}
+                    style={{ width: `${progressPct}%` }}
                 />
             </div>
 
@@ -454,7 +407,7 @@ function Tutorial() {
                         />
                         {saveError && <p className="error-message">{saveError}</p>}
                         {activeModule?.completed && (
-                            <div className="quiz-done-actions" style={{ marginTop: '1rem' }}>
+                            <div className="quiz-done-actions">
                                 <button
                                     className="secondary-button"
                                     type="button"
@@ -468,10 +421,7 @@ function Tutorial() {
                 ) : (
                     <>
                         <LessonView lesson={lessons[step]} />
-                        <div
-                            className="lesson-nav"
-                            style={{ display: 'flex', gap: '0.75rem', justifyContent: 'space-between', marginTop: '1.5rem' }}
-                        >
+                        <div className="lesson-nav">
                             <button
                                 className="secondary-button"
                                 type="button"

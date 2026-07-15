@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
-import TileCard from '../components/TileCard'
+import TileCard, { TileFace } from '../components/TileCard'
 
 function tileKey(tile, index) {
     return `${tile.code}-${index}`
@@ -28,9 +28,9 @@ function ChallengeTile({ tile, index, isSelected, isDisabled, onClick }) {
             onClick={() => onClick(index)}
             disabled={isDisabled}
             aria-pressed={isSelected}
+            title={tile.label}
         >
-            <span className="tile-code">{tile.code}</span>
-            <span className="tile-label">{tile.label}</span>
+            <TileFace tile={tile} />
         </button>
     )
 }
@@ -39,12 +39,7 @@ function ResultTile({ tile }) {
     if (!tile) {
         return null
     }
-    return (
-        <div className={`tile tile-${tile.suit}`}>
-            <span className="tile-code">{tile.code}</span>
-            <span className="tile-label">{tile.label}</span>
-        </div>
-    )
+    return <TileCard tile={tile} />
 }
 
 function HistoryEntry({ attempt }) {
@@ -213,7 +208,7 @@ function Trainer() {
             </section>
 
             <section className="helper-layout">
-                <section className="tile-picker-panel">
+                <section className="tile-picker-panel felt-panel">
                     <div className="panel-heading">
                         <div>
                             <p className="eyebrow">Your hand</p>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { LogoMark } from '../components/Logo'
 
 function Login() {
     const [username, setUsername] = useState('')
@@ -26,8 +27,12 @@ function Login() {
     return (
         <div className="auth-page">
             <section className="auth-card">
-                <p className="eyebrow">MahjongSensei</p>
-                <h2>Login</h2>
+                <div className="auth-brand">
+                    <LogoMark />
+                    <p className="eyebrow">MahjongSensei</p>
+                </div>
+                <h2>Welcome back</h2>
+                <p className="auth-sub">Sign in to continue your training.</p>
                 {error && <p className="error-message">{error}</p>}
                 <form className="auth-form" onSubmit={handleSubmit}>
                     <label htmlFor="login-username">Username</label>
@@ -49,7 +54,7 @@ function Login() {
                     />
                     <button className="primary-button" type="submit">Login</button>
                 </form>
-                <p>No account? <Link to="/register">Register</Link></p>
+                <p className="auth-switch">No account? <Link to="/register">Register</Link></p>
             </section>
         </div>
     )
