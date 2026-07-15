@@ -14,6 +14,7 @@ from .engine import (
     NUMBERED_SUITS,
     Deck,
     Hand,
+    HandEvaluator,
     ScoreCalculator,
     Tile,
     ValuationAlgorithm,
@@ -29,6 +30,11 @@ WALL_RESERVE = 15
 
 # Claim priority: a win beats a Pong/Kong, which beats a Chow.
 CLAIM_PRIORITY = {"win": 3, "kong": 2, "pong": 2, "chow": 1}
+
+# How much a locked, completed meld is worth when an AI weighs up a claim. Set
+# near a concealed triplet's value so claiming a set the AI already half-holds
+# reads as progress, while claims that would break up useful tiles do not.
+MELD_STRENGTH = 9
 
 
 class Player:
@@ -260,7 +266,7 @@ class SoloGame:
             opts = self._player_claims(index, discarder, tile)
             if not opts:
                 continue
-            action = self._ai_will_claim(opts["actions"], tile)
+            action = self._ai_will_claim(self.players[index], opts, tile)
             if action is None:
                 continue
             ai_actions[index] = action
@@ -331,18 +337,62 @@ class SoloGame:
                 runs.append(low)
         return runs
 
-    def _ai_will_claim(self, actions, tile):
-        """Which action an AI seat commits to. AI always takes a win, and claims
-        a Pong/Kong of honour tiles (winds/dragons); it otherwise stays
-        concealed rather than claiming suit tiles or Chows."""
+    def _ai_will_claim(self, player, opts, tile):
+        """Which action an AI seat commits to. It always takes a win. For a
+        Pong, Kong or Chow (any suit) it forms the meld only if doing so leaves
+        the hand stronger than passing, so it claims tiles that help and leaves
+        the rest. The highest-priority helpful claim (kong > pong > chow) wins."""
+        actions = opts["actions"]
         if "win" in actions:
             return "win"
-        if tile.suit == "honour":
-            if "kong" in actions:
-                return "kong"
-            if "pong" in actions:
-                return "pong"
+
+        baseline = self._hand_strength(player.hand.tiles, len(player.hand.melds))
+        for action in ("kong", "pong", "chow"):
+            if action not in actions:
+                continue
+            strength = self._claim_strength(player, action, tile)
+            if strength is not None and strength > baseline:
+                return action
         return None
+
+    def _hand_strength(self, tiles, meld_count):
+        """A rough score for a hand: the concealed tiles' shape plus a bonus for
+        each completed meld already locked away."""
+        return HandEvaluator().evaluate_hand(tiles) + MELD_STRENGTH * meld_count
+
+    def _claim_strength(self, player, action, tile):
+        """Hand strength if the AI makes this claim (before it discards), or None
+        if it cannot form the meld."""
+        suit, value = tile.suit, tile.value
+        concealed = list(player.hand.tiles)
+        used = []
+
+        if action in ("pong", "kong"):
+            need = 3 if action == "kong" else 2
+            matches = [t for t in concealed if t.suit == suit and t.value == value]
+            if len(matches) < need:
+                return None
+            used = matches[:need]
+        elif action == "chow":
+            runs = self._chow_runs(player, suit, value)
+            if not runs:
+                return None
+            low = runs[0]
+            for needed_value in (v for v in (low, low + 1, low + 2) if v != value):
+                match = next(
+                    (t for t in concealed if t.suit == suit and t.value == needed_value),
+                    None,
+                )
+                if match is None:
+                    return None
+                used.append(match)
+        else:
+            return None
+
+        remaining = list(concealed)
+        for used_tile in used:
+            remaining.remove(used_tile)
+        return self._hand_strength(remaining, len(player.hand.melds) + 1)
 
     def _execute_best_ai(self, ai_actions, discarder, tile):
         """Run the highest priority AI claim; ties go to the seat nearest after
