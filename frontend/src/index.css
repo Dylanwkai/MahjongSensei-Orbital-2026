@@ -1537,3 +1537,10 @@ button.tile:focus-visible {
     width: 38px;
   }
 }
+
+/* Solo Play: the tile just drawn onto the player's turn - set apart on the
+   right with a gap and a white outline. */
+.picker-tile.drawn-tile {
+  margin-left: 20px;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 6px 1px rgba(255, 255, 255, 0.7);
+}

@@ -540,6 +540,7 @@ class SoloGame:
             ),
             "win_type": self.win_type,
             "last_discard": self.last_discard.to_dict() if self.last_discard else None,
+            "last_drawn": self.last_drawn.to_dict() if self.last_drawn else None,
             "discards": [
                 {"seat": self.players[i].seat_wind, "tile": t.to_dict()}
                 for i, t in self.discards

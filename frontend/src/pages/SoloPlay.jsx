@@ -168,6 +168,9 @@ function SoloPlay() {
     const [error, setError] = useState('')
     const [isBusy, setIsBusy] = useState(false)
     const [hint, setHint] = useState(null)
+    // True when the human's most recent action ends in a fresh draw, so the
+    // newly drawn tile should be held back during the reveal then highlighted.
+    const [drawnActive, setDrawnActive] = useState(false)
 
     // How many discards are currently revealed. When a move produces several AI
     // discards at once, we reveal them one at a time (see commitState).
@@ -245,6 +248,7 @@ function SoloPlay() {
     const newGame = async () => {
         setIsBusy(true)
         setError('')
+        setDrawnActive(false)
         try {
             const response = await api.post('/api/game/solo/new/')
             commitState(response.data, false)
@@ -258,6 +262,7 @@ function SoloPlay() {
     const discard = async (tile) => {
         setIsBusy(true)
         setError('')
+        setDrawnActive(true)  // we will draw again once the AI seats finish
         try {
             const response = await api.post('/api/game/solo/discard/', {
                 suit: tile.suit,
@@ -274,6 +279,7 @@ function SoloPlay() {
     const declareKong = async (tile) => {
         setIsBusy(true)
         setError('')
+        setDrawnActive(false)
         try {
             const response = await api.post('/api/game/solo/kong/', {
                 suit: tile.suit,
@@ -296,6 +302,7 @@ function SoloPlay() {
                 body.low_value = lowValue
             }
             const response = await api.post('/api/game/solo/claim/', body)
+            setDrawnActive(false)  // a claim takes a discard, no fresh draw
             commitState(response.data, true)
         } catch (err) {
             setError(err.response?.data?.error || 'Could not make that claim.')
@@ -309,6 +316,7 @@ function SoloPlay() {
         setError('')
         try {
             const response = await api.post('/api/game/solo/pass/')
+            setDrawnActive(true)  // passing returns play to us and we draw
             commitState(response.data, true)
         } catch (err) {
             setError(err.response?.data?.error || 'Could not pass.')
@@ -362,6 +370,43 @@ function SoloPlay() {
     const revealedDiscards = state ? state.discards.slice(0, revealCount) : []
     const yourTurn = state && state.is_human_turn && !state.result && !revealing
     const locked = isBusy || revealing
+
+    // The tile just drawn onto the human's turn. It is hidden until the AI
+    // discards have all been revealed, then shown with a highlight.
+    const drawnKey = (
+        drawnActive && state && state.is_human_turn && !state.result && state.last_drawn
+            ? `${state.last_drawn.suit}-${state.last_drawn.value}`
+            : null
+    )
+
+    // The hand tiles to render. The freshly drawn tile is pulled out of its
+    // sorted position: hidden entirely while the AI discards are still being
+    // revealed, then shown on its own at the right end of the hand (and
+    // highlighted) until the player discards, at which point it settles back
+    // into the sorted hand on their next draw.
+    const handTiles = useMemo(() => {
+        const tiles = human?.tiles || []
+        if (!drawnKey) {
+            return tiles.map((tile) => ({ tile, isDrawn: false }))
+        }
+
+        let drawn = null
+        const rest = []
+        for (const tile of tiles) {
+            if (!drawn && `${tile.suit}-${tile.value}` === drawnKey) {
+                drawn = tile
+                continue
+            }
+            rest.push({ tile, isDrawn: false })
+        }
+
+        // While revealing, keep the drawn tile hidden; otherwise append it on
+        // the right.
+        if (drawn && !revealing) {
+            rest.push({ tile: drawn, isDrawn: true })
+        }
+        return rest
+    }, [human, drawnKey, revealing])
 
     return (
         <AppLayout>
@@ -491,16 +536,16 @@ function SoloPlay() {
                         <MeldRow melds={human?.melds} />
 
                         <div className="picker-grid" style={{ marginTop: human?.melds?.length ? 12 : 0 }}>
-                            {(human?.tiles || []).map((tile, i) => {
+                            {handTiles.map(({ tile, isDrawn }, i) => {
                                 const isHinted = yourTurn && hintKeys.has(`${tile.suit}-${tile.value}`)
                                 return (
                                 <button
                                     key={`${tile.code}-${i}`}
-                                    className={`tile picker-tile tile-${tile.suit}${isHinted ? ' hint-tile' : ''}`}
+                                    className={`tile picker-tile tile-${tile.suit}${isHinted ? ' hint-tile' : ''}${isDrawn ? ' drawn-tile' : ''}`}
                                     type="button"
                                     onClick={() => discard(tile)}
                                     disabled={!yourTurn || locked}
-                                    title={tile.label}
+                                    title={isDrawn ? `${tile.label} (just drawn)` : tile.label}
                                 >
                                     <TileFace tile={tile} />
                                 </button>
