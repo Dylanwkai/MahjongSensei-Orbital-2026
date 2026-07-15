@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import Logo from './Logo'
 
 function AppLayout({ children }) {
     const { user, logout } = useAuth()
@@ -13,10 +14,9 @@ function AppLayout({ children }) {
     return (
         <div className="app-shell">
             <header className="topbar">
-                <div className="brand-block">
-                    <p className="eyebrow">MahjongSensei</p>
-                    <h1>Learning dashboard</h1>
-                </div>
+                <NavLink to="/home" style={{ textDecoration: 'none' }}>
+                    <Logo />
+                </NavLink>
 
                 <nav className="main-nav" aria-label="Main navigation">
                     <NavLink to="/home">Home</NavLink>
@@ -28,7 +28,7 @@ function AppLayout({ children }) {
                 </nav>
 
                 <div className="session-controls">
-                    <span>{user || 'Player'}</span>
+                    <span className="user-chip">{user || 'Player'}</span>
                     <button className="secondary-button" onClick={handleLogout}>
                         Logout
                     </button>

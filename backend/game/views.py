@@ -19,6 +19,8 @@ from .engine import (
     ValuationAlgorithm,
     WinChecker,
 )
+from users.models import Profile
+
 from .models import Move, Session
 from .solo import SoloGame
 
@@ -223,11 +225,21 @@ def find_matching_tile(tiles, suit, value):
     return None
 
 
+TRAINER_DIFFICULTIES = ("easy", "medium", "hard")
+
+
 class TrainerNewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        hand = HandGenerator().generate_random_hand(hand_size=TRAINER_HAND_SIZE)
+        difficulty = request.data.get("difficulty") or request.query_params.get(
+            "difficulty"
+        )
+        if difficulty not in TRAINER_DIFFICULTIES:
+            difficulty = "medium"
+        hand = HandGenerator().generate_random_hand(
+            hand_size=TRAINER_HAND_SIZE, difficulty=difficulty
+        )
 
         # Reuse the user's most recent trainer session, or start one. We avoid
         # get_or_create here because a user can legitimately have more than one
@@ -249,7 +261,9 @@ class TrainerNewView(APIView):
 
         tile_dicts = [tile.to_dict() for tile in hand.sorted_tiles()]
         bonus_dicts = [tile.to_dict() for tile in hand.bonus_tiles]
-        move = Move.objects.create(session=session, hand=tile_dicts)
+        move = Move.objects.create(
+            session=session, hand=tile_dicts, difficulty=difficulty
+        )
 
         return Response(
             {
@@ -257,6 +271,7 @@ class TrainerNewView(APIView):
                 "session_id": session.id,
                 "tiles": tile_dicts,
                 "bonus_tiles": bonus_dicts,
+                "difficulty": difficulty,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -310,8 +325,12 @@ class TrainerSubmitView(APIView):
             )
 
         hand = Hand(hand_tiles)
-        recommendation = ValuationAlgorithm().recommend_discard(hand)
+        valuation = ValuationAlgorithm()
+        recommendation = valuation.recommend_discard(hand)
         best_score = recommendation["score"]
+
+        # Several tiles can be equally optimal, so collect all of them.
+        optimal_discards = valuation.optimal_discards(hand)["discards"]
 
         evaluator = HandEvaluator()
         remaining = hand_tiles.copy()
@@ -329,12 +348,18 @@ class TrainerSubmitView(APIView):
         move.is_correct = is_correct
         move.save()
 
+        optimal_labels = [tile["label"] for tile in optimal_discards]
         if is_correct:
             feedback = "Nice — that's an optimal discard."
+        elif len(optimal_labels) == 1:
+            feedback = (
+                f"Not quite. The optimal discard is {optimal_labels[0]}. "
+                + recommendation["reasoning"]
+            )
         else:
             feedback = (
-                f"Not quite. Discarding {recommendation['discard']['label']} keeps a "
-                "stronger hand. " + recommendation["reasoning"]
+                "Not quite. Any of these is optimal: "
+                f"{', '.join(optimal_labels)}. " + recommendation["reasoning"]
             )
 
         return Response(
@@ -343,6 +368,7 @@ class TrainerSubmitView(APIView):
                 "your_discard": move.user_discard,
                 "your_score": user_score,
                 "correct_discard": move.correct_discard,
+                "optimal_discards": optimal_discards,
                 "best_score": best_score,
                 "reasoning": recommendation["reasoning"],
                 "feedback": feedback,
@@ -359,18 +385,35 @@ class TrainerHistoryView(APIView):
             user_discard__isnull=False,
         ).order_by("-created_at")[:50]
 
-        attempts = [
-            {
-                "move_id": move.id,
-                "is_correct": move.is_correct,
-                "your_discard": move.user_discard,
-                "correct_discard": move.correct_discard,
-                "your_score": move.user_score,
-                "best_score": move.best_score,
-                "created_at": move.created_at,
-            }
-            for move in moves
-        ]
+        valuation = ValuationAlgorithm()
+        attempts = []
+        for move in moves:
+            # Recompute the full set of optimal discards from the stored hand.
+            # The evaluator is deterministic, so this matches what was shown at
+            # submit time, and it also backfills older attempts.
+            optimal = None
+            if move.hand:
+                try:
+                    optimal = valuation.optimal_discards(
+                        Hand(tiles_from_dicts(move.hand))
+                    )["discards"]
+                except (ValueError, KeyError, AttributeError):
+                    optimal = None
+
+            attempts.append(
+                {
+                    "move_id": move.id,
+                    "is_correct": move.is_correct,
+                    "difficulty": move.difficulty,
+                    "hand": move.hand,
+                    "your_discard": move.user_discard,
+                    "correct_discard": move.correct_discard,
+                    "optimal_discards": optimal,
+                    "your_score": move.user_score,
+                    "best_score": move.best_score,
+                    "created_at": move.created_at,
+                }
+            )
 
         total = len(attempts)
         correct = sum(1 for attempt in attempts if attempt["is_correct"])
@@ -397,6 +440,28 @@ def _get_solo_game(request):
     return _SOLO_GAMES.get(request.user.id)
 
 
+def _record_solo_result(user, game):
+    """When a solo game has just finished, count it once towards the player's
+    profile: every finished game (win or washout) is a game played, and a win
+    for the human seat is a game won."""
+    if game is None or game.result is None:
+        return
+    if getattr(game, "_result_recorded", False):
+        return
+
+    profile, _ = Profile.objects.get_or_create(user=user)
+    profile.games_played += 1
+    if game.result == "win" and game.winner_index == game.human_index():
+        profile.games_won += 1
+    profile.win_rate = (
+        round(profile.games_won / profile.games_played * 100, 1)
+        if profile.games_played
+        else 0.0
+    )
+    profile.save()
+    game._result_recorded = True
+
+
 class SoloNewView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -404,6 +469,7 @@ class SoloNewView(APIView):
         game = SoloGame(human_seat="east")
         game.start()
         _SOLO_GAMES[request.user.id] = game
+        _record_solo_result(request.user, game)  # in the rare instant-end case
         return Response(game.public_state(), status=status.HTTP_201_CREATED)
 
 
@@ -434,6 +500,7 @@ class SoloDiscardView(APIView):
             game.human_discard(request.data.get("suit"), request.data.get("value"))
         except ValueError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        _record_solo_result(request.user, game)
         return Response(game.public_state())
 
 
@@ -451,6 +518,7 @@ class SoloKongView(APIView):
             game.human_declare_kong(request.data.get("suit"), request.data.get("value"))
         except ValueError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        _record_solo_result(request.user, game)
         return Response(game.public_state())
 
 
@@ -476,6 +544,7 @@ class SoloClaimView(APIView):
             )
         except ValueError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        _record_solo_result(request.user, game)
         return Response(game.public_state())
 
 
@@ -495,4 +564,49 @@ class SoloPassView(APIView):
             game.human_pass_claim()
         except ValueError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        _record_solo_result(request.user, game)
         return Response(game.public_state())
+
+
+class SoloHintView(APIView):
+    """GET /api/game/solo/hint/
+
+    Suggest a discard for the human's current hand using the same valuation
+    engine the AI seats use. Returns the recommended tile plus every equally
+    optimal discard.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        game = _get_solo_game(request)
+        if game is None:
+            return Response(
+                {"error": "No active game. Start a new one."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        human_index = game.human_index()
+        if game.result is not None:
+            return Response(
+                {"error": "The game is over."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if game.phase != "discard" or game.current_index != human_index:
+            return Response(
+                {"error": "A hint is only available on your turn to discard."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        hand = game.players[human_index].hand
+        valuation = ValuationAlgorithm()
+        recommendation = valuation.recommend_discard(hand)
+        optimal = valuation.optimal_discards(hand)["discards"]
+
+        return Response(
+            {
+                "discard": recommendation["discard"],
+                "optimal_discards": optimal,
+                "reasoning": recommendation["reasoning"],
+            }
+        )

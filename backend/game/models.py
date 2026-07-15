@@ -44,6 +44,7 @@ class Move(models.Model):
         related_name="moves",
     )
     hand = models.JSONField()  # list of tile dicts presented to the user
+    difficulty = models.CharField(max_length=10, null=True, blank=True)
     user_discard = models.JSONField(null=True, blank=True)
     correct_discard = models.JSONField(null=True, blank=True)
     is_correct = models.BooleanField(null=True, blank=True)

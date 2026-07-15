@@ -44,25 +44,12 @@ function Quiz({ questions, onComplete, isSubmitting }) {
         )
     }
 
-    const optionStyle = (index) => {
-        const base = {
-            textAlign: 'left',
-            padding: '0.75rem 1rem',
-            borderRadius: '10px',
-            border: '1px solid rgba(148, 163, 184, 0.4)',
-            background: 'rgba(255, 255, 255, 0.04)',
-            color: 'inherit',
-            cursor: answered ? 'default' : 'pointer',
-            font: 'inherit',
-        }
-        if (!answered) return base
-        if (index === question.answer) {
-            return { ...base, borderColor: '#22c55e', background: 'rgba(34, 197, 94, 0.18)' }
-        }
-        if (index === selected) {
-            return { ...base, borderColor: '#ef4444', background: 'rgba(239, 68, 68, 0.18)' }
-        }
-        return { ...base, opacity: 0.6 }
+    // Once answered: highlight the right answer, flag a wrong pick, dim the rest.
+    const optionClass = (index) => {
+        if (!answered) return 'quiz-option'
+        if (index === question.answer) return 'quiz-option quiz-correct'
+        if (index === selected) return 'quiz-option quiz-wrong'
+        return 'quiz-option quiz-dim'
     }
 
     return (
@@ -74,16 +61,12 @@ function Quiz({ questions, onComplete, isSubmitting }) {
                 </div>
             </div>
 
-            <div
-                className="quiz-options"
-                style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', margin: '1rem 0' }}
-            >
+            <div className="quiz-options">
                 {question.options.map((option, index) => (
                     <button
                         key={index}
                         type="button"
-                        className="quiz-option"
-                        style={optionStyle(index)}
+                        className={optionClass(index)}
                         onClick={() => choose(index)}
                         disabled={answered}
                     >
@@ -93,7 +76,7 @@ function Quiz({ questions, onComplete, isSubmitting }) {
             </div>
 
             {answered && (
-                <div className="quiz-feedback" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="quiz-feedback">
                     <p>
                         {selected === question.answer
                             ? 'Correct!'
