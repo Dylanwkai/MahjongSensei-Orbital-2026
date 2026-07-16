@@ -678,8 +678,8 @@ class WinChecker:
 
 
 # Tai (point) values. Edit these to match a different house rule set. A hand
-# must be worth at least MIN_TAI_TO_WIN, and by default flowers do not count
-# towards that minimum.
+# must be worth at least MIN_TAI_TO_WIN, and flowers and animals count towards
+# that minimum (so a hand can win on bonus tiles alone).
 SCORING = {
     "seat_wind": 1,
     "round_wind": 1,
@@ -696,7 +696,7 @@ SCORING = {
 }
 
 MIN_TAI_TO_WIN = 1
-FLOWERS_COUNT_TOWARD_MIN = False
+FLOWERS_COUNT_TOWARD_MIN = True
 
 
 def parse_flower(value):
@@ -769,8 +769,7 @@ class ScoreCalculator:
             "reason": (
                 ""
                 if is_valid
-                else f"A winning hand needs at least {MIN_TAI_TO_WIN} tai "
-                "(flowers excluded)."
+                else f"A winning hand needs at least {MIN_TAI_TO_WIN} tai."
             ),
         }
 

@@ -29,6 +29,15 @@ TUTORIAL_MODULES = [
         ),
         "order": 3,
     },
+    {
+        "id": "tai-scoring",
+        "title": "Tai Scoring",
+        "description": (
+            "Count your points: how winds, dragons, flushes, special hands, "
+            "flowers, and animals earn tai."
+        ),
+        "order": 4,
+    },
 ]
 
 MODULE_IDS = {module["id"] for module in TUTORIAL_MODULES}

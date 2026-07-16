@@ -187,6 +187,108 @@ const LESSON_CONTENT = {
             },
         ],
     },
+    'tai-scoring': {
+        lessons: [
+            {
+                title: 'What is tai?',
+                body:
+                    'Tai are the points a winning hand is worth. A hand must be worth at least 1 tai before you are allowed to win. Tai come from special hand patterns, from winds and dragons, from being all one suit, and from bonus tiles. You add up every tai your hand qualifies for.',
+            },
+            {
+                title: 'Winds and dragons',
+                body:
+                    'A Pong or Kong of a dragon (Red, Green, or White) scores 1 tai each. A Pong of your seat wind scores 1 tai, and a Pong of the round (prevailing) wind scores 1 tai — so if you are East in the East round, a Pong of East counts twice, for 2 tai. A single pair of winds or dragons scores nothing; you need the triplet.',
+                groups: [
+                    [makeTile('honour', 'red'), makeTile('honour', 'red'), makeTile('honour', 'red')],
+                    [makeTile('honour', 'east'), makeTile('honour', 'east'), makeTile('honour', 'east')],
+                ],
+            },
+            {
+                title: 'Flushes and all pongs',
+                body:
+                    'A Half Flush — one suit plus honours — scores 2 tai. A Full Flush — one suit and no honours at all — scores 4 tai. All Pongs, a hand whose four sets are all Pongs or Kongs (no Chow), scores 2 tai. These stack with your wind and dragon tai.',
+                groups: [
+                    [makeTile('circles', 2), makeTile('circles', 3), makeTile('circles', 4)],
+                    [makeTile('circles', 6), makeTile('circles', 7), makeTile('circles', 8)],
+                    [makeTile('circles', 9), makeTile('circles', 9), makeTile('circles', 9)],
+                    [makeTile('circles', 1), makeTile('circles', 1)],
+                ],
+            },
+            {
+                title: 'Pinghu',
+                body:
+                    'Pinghu is a hand of four Chows plus a pair with no flowers or animals — it scores 4 tai. If the same shape has any flower or animal it becomes a Smelly Pinghu, worth just 1 tai. Pinghu only counts on a self-draw, or on a discard where you were waiting on two possible tiles (for example holding 3-4 and able to win on 2 or 5).',
+                groups: [
+                    [makeTile('bamboo', 1), makeTile('bamboo', 2), makeTile('bamboo', 3)],
+                    [makeTile('bamboo', 4), makeTile('bamboo', 5), makeTile('bamboo', 6)],
+                    [makeTile('circles', 3), makeTile('circles', 4), makeTile('circles', 5)],
+                    [makeTile('characters', 6), makeTile('characters', 7), makeTile('characters', 8)],
+                    [makeTile('characters', 2), makeTile('characters', 2)],
+                ],
+            },
+            {
+                title: 'Special hands: Seven Pairs and Thirteen Orphans',
+                body:
+                    'Some hands break the usual four-melds-plus-a-pair shape. Seven Pairs — seven different pairs — scores 2 tai. Thirteen Orphans — one of every terminal (1 and 9 of each suit) and every honour, with one of them paired — is a hard, prized hand worth 5 tai.',
+                tiles: [
+                    makeTile('bamboo', 1), makeTile('bamboo', 9),
+                    makeTile('circles', 1), makeTile('circles', 9),
+                    makeTile('characters', 1), makeTile('characters', 9),
+                    makeTile('honour', 'east'), makeTile('honour', 'south'),
+                    makeTile('honour', 'west'), makeTile('honour', 'north'),
+                    makeTile('honour', 'red'), makeTile('honour', 'green'),
+                    makeTile('honour', 'white'),
+                ],
+            },
+            {
+                title: 'Flowers and animals',
+                body:
+                    'Bonus tiles score too. Each seat owns one flower number — East is 1, South is 2, West is 3, North is 4 — and holding your seat flower scores 1 tai. Every animal tile (cat, mouse, centipede, chicken) scores 1 tai. Flowers and animals count toward the 1-tai minimum, so a hand can win on its bonus tiles alone.',
+                tiles: [
+                    makeTile('flower', 'red_1'),
+                    makeTile('animal', 'cat'),
+                    makeTile('animal', 'mouse'),
+                ],
+            },
+        ],
+        quiz: [
+            {
+                prompt: 'How many tai must a hand be worth before you can win?',
+                options: ['0', '1', '2', '5'],
+                answer: 1,
+            },
+            {
+                prompt: 'A Pong of the Green Dragon is worth…',
+                options: ['0 tai', '1 tai', '2 tai', '4 tai'],
+                answer: 1,
+            },
+            {
+                prompt: 'A hand entirely in one suit with no honour tiles (Full Flush) scores…',
+                options: ['1 tai', '2 tai', '4 tai', '5 tai'],
+                answer: 2,
+            },
+            {
+                prompt: 'Four Chows and a pair with no flowers or animals is called…',
+                options: [
+                    'All Pongs (2 tai)',
+                    'Pinghu (4 tai)',
+                    'Seven Pairs (2 tai)',
+                    'Smelly Pinghu (1 tai)',
+                ],
+                answer: 1,
+            },
+            {
+                prompt: 'Thirteen Orphans is worth how many tai?',
+                options: ['2 tai', '3 tai', '4 tai', '5 tai'],
+                answer: 3,
+            },
+            {
+                prompt: 'Holding your own seat flower scores…',
+                options: ['0 tai', '1 tai', '2 tai', 'It ends the game'],
+                answer: 1,
+            },
+        ],
+    },
 }
 
 function LessonView({ lesson }) {

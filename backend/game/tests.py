@@ -1028,7 +1028,7 @@ class ScoreCalculatorTests(TestCase):
         self.assertTrue(score["is_valid_win"])
         self.assertEqual(score["hand_tai"], 2)  # seat wind + round wind
 
-    def test_chicken_hand_fails_minimum_tai_even_with_a_flower(self):
+    def test_flower_alone_meets_the_minimum_tai(self):
         # All chows, no winds/dragons/flush -> 0 hand tai.
         hand = tiles(
             "B", 1, "B", 2, "B", 3,
@@ -1038,12 +1038,20 @@ class ScoreCalculatorTests(TestCase):
             "C", 9, "C", 9,
         )
         win = WinChecker().check(hand)
-        flower = Tile("flower", "red_1", is_bonus=True)  # East's seat flower
-        score = ScoreCalculator(seat_wind="east", round_wind="east").score(win, [flower])
+        calc = ScoreCalculator(seat_wind="east", round_wind="east")
 
-        self.assertEqual(score["hand_tai"], 0)
-        self.assertEqual(score["bonus_tai"], 1)
-        self.assertFalse(score["is_valid_win"])  # flowers don't meet the minimum
+        # With no bonus tiles the hand is worth 0 tai and cannot win.
+        plain = calc.score(win, [])
+        self.assertEqual(plain["hand_tai"], 0)
+        self.assertFalse(plain["is_valid_win"])
+
+        # The seat flower adds 1 tai, which now meets the minimum on its own.
+        flower = Tile("flower", "red_1", is_bonus=True)  # East's seat flower
+        with_flower = calc.score(win, [flower])
+        self.assertEqual(with_flower["hand_tai"], 0)
+        self.assertEqual(with_flower["bonus_tai"], 1)
+        self.assertEqual(with_flower["total_tai"], 1)
+        self.assertTrue(with_flower["is_valid_win"])
 
     def test_full_flush_all_pongs_scores(self):
         # Four bamboo pongs + bamboo pair: full flush + all pongs.
