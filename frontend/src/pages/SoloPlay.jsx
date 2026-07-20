@@ -27,21 +27,68 @@ function MeldRow({ melds }) {
     )
 }
 
-function Opponent({ player }) {
+// A single face-down tile (the back). Used for hidden opponent hands and the
+// wall is drawn separately as thin slivers.
+function TileBack() {
+    return <div className="tile-back" aria-hidden="true" />
+}
+
+function HandBacks({ count }) {
     return (
-        <article className="status-card">
-            <p className="eyebrow">{player.seat_wind}</p>
-            <strong>{player.name}</strong>
-            <span>{player.tile_count} tiles in hand</span>
+        <div className="hand-backs">
+            {Array.from({ length: Math.max(0, count) }).map((_, i) => (
+                <TileBack key={i} />
+            ))}
+        </div>
+    )
+}
+
+// One AI seat: name + tile count, their face-up melds and bonus tiles, and their
+// concealed hand shown as tile backs.
+function SeatPanel({ player, active }) {
+    if (!player) {
+        return null
+    }
+    return (
+        <article className={`seat-panel${active ? ' seat-active' : ''}`}>
+            <div className="seat-head">
+                <span className="seat-wind">{player.seat_wind}</span>
+                <strong>{player.name}</strong>
+                <span className="seat-count">{player.tile_count} tiles</span>
+            </div>
             <MeldRow melds={player.melds} />
-            {player.bonus_tiles.length > 0 && (
-                <div className="meld-row" style={{ marginTop: 8 }}>
+            {player.bonus_tiles?.length > 0 && (
+                <div className="seat-bonus">
                     {player.bonus_tiles.map((tile, i) => (
                         <TileCard key={`${tile.code}-${i}`} tile={tile} size="sm" />
                     ))}
                 </div>
             )}
+            <HandBacks count={player.tile_count} />
         </article>
+    )
+}
+
+// The wall: a strip of slivers with the drawable (live) tiles on one end and the
+// dead wall (Kong / flower / animal replacements) on the other.
+function WallBar({ live, dead }) {
+    const liveShown = Math.min(live, 40)
+    return (
+        <div className="wall-bar">
+            <div className="wall-labels">
+                <span>Draw ▸ {live} drawable</span>
+                <span>{dead} dead wall</span>
+            </div>
+            <div className="wall-strip" aria-hidden="true">
+                {Array.from({ length: liveShown }).map((_, i) => (
+                    <span key={`l${i}`} className="wall-sliver" />
+                ))}
+                <span className="wall-divider" />
+                {Array.from({ length: dead }).map((_, i) => (
+                    <span key={`d${i}`} className="wall-sliver wall-dead" />
+                ))}
+            </div>
+        </div>
     )
 }
 
@@ -339,8 +386,9 @@ function SoloPlay() {
         () => state?.players.find((player) => player.is_human) || null,
         [state],
     )
-    const opponents = useMemo(
-        () => (state ? state.players.filter((player) => !player.is_human) : []),
+    // Look up a seat by its wind, for placing players around the table.
+    const seatOf = useCallback(
+        (wind) => state?.players.find((player) => player.seat_wind === wind) || null,
         [state],
     )
 
@@ -408,17 +456,27 @@ function SoloPlay() {
         return rest
     }, [human, drawnKey, revealing])
 
+    // Discards laid in front of each seat, around the centre of the table.
+    const renderSeatDiscards = (wind) => {
+        const items = revealedDiscards.filter((entry) => entry.seat === wind)
+        if (items.length === 0) {
+            return null
+        }
+        return (
+            <div className="discard-tiles">
+                {items.map((entry, i) => (
+                    <TileCard key={`${wind}-${entry.tile.code}-${i}`} tile={entry.tile} size="sm" />
+                ))}
+            </div>
+        )
+    }
+
     return (
         <AppLayout>
-            <section className="profile-header">
+            <section className="profile-header solo-header">
                 <div>
                     <p className="eyebrow">Solo Play</p>
                     <h2>Play a round against the computer</h2>
-                    <p>
-                        You are East. Draw and discard against three AI opponents who use the
-                        same valuation engine. Claim Pong, Kong, Chow or a winning tile off
-                        their discards when the prompt appears.
-                    </p>
                 </div>
                 <button className="primary-button" type="button" onClick={newGame} disabled={isBusy}>
                     {state ? 'New game' : 'Start game'}
@@ -435,156 +493,165 @@ function SoloPlay() {
                 <>
                     {state.win && !revealing && <WinSummary win={state.win} />}
 
-                    <section className="status-grid" aria-label="Game status" style={{ marginTop: 24 }}>
-                        <article className="status-card">
-                            <p className="eyebrow">Round wind</p>
-                            <strong style={{ textTransform: 'capitalize' }}>{state.round_wind}</strong>
-                            <span>Wall: {state.live_wall_count} drawable</span>
-                        </article>
-                        <article className="status-card">
-                            <p className="eyebrow">Turn</p>
-                            <strong style={{ textTransform: 'capitalize' }}>{state.current_seat}</strong>
-                            <span>{state.result ? 'Game over' : (yourTurn ? 'Your move' : 'Opponent moving')}</span>
-                        </article>
-                        <article className="status-card">
-                            <p className="eyebrow">Status</p>
-                            <strong style={{ textTransform: 'capitalize' }}>
-                                {state.result
-                                    ? (state.result === 'win' ? `${state.winner_seat} wins` : 'Washout')
-                                    : 'In progress'}
-                            </strong>
-                            <span>{state.result === 'win' ? (state.win_type || '').replace('_', ' ') : ''}</span>
-                        </article>
-                    </section>
+                    <div className="solo-status">
+                        <span>Round wind: <strong style={{ textTransform: 'capitalize' }}>{state.round_wind}</strong></span>
+                        <span>Turn: <strong style={{ textTransform: 'capitalize' }}>{state.current_seat}</strong></span>
+                        <span>
+                            {state.result
+                                ? (state.result === 'win' ? `${state.winner_seat} wins` : 'Washout draw')
+                                : revealing
+                                    ? 'Opponents playing…'
+                                    : yourTurn
+                                        ? 'Your move'
+                                        : 'Opponent moving'}
+                        </span>
+                    </div>
 
-                    <section style={{ marginTop: 24 }}>
-                        <p className="eyebrow">Opponents</p>
-                        <div className="solo-opponents">
-                            {opponents.map((player) => (
-                                <Opponent key={player.seat_wind} player={player} />
-                            ))}
-                        </div>
-                    </section>
-
-                    <section className="tile-picker-panel felt-panel" style={{ marginTop: 24 }}>
-                        <div className="panel-heading">
-                            <div>
-                                <p className="eyebrow">Latest discards</p>
-                                <h3>
-                                    {revealedDiscards.length} discarded
-                                    {revealing ? ' · opponents playing…' : ''}
-                                </h3>
-                            </div>
-                        </div>
-                        {revealedDiscards.length > 0 ? (
-                            <div className="meld-row">
-                                {revealedDiscards.slice(-12).map((entry, i) => (
-                                    <TileCard key={`${entry.tile.code}-${i}`} tile={entry.tile} size="sm" />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="empty-state">
-                                <p>No discards yet.</p>
-                            </div>
-                        )}
-                    </section>
-
-                    {state.awaiting_claim && state.claim && !revealing && (
-                        <ClaimPrompt claim={state.claim} onClaim={claim} onPass={passClaim} disabled={isBusy} />
-                    )}
-
-                    <section className="tile-picker-panel felt-panel" style={{ marginTop: 24 }}>
-                        <div className="panel-heading">
-                            <div>
-                                <p className="eyebrow">Your hand (East)</p>
-                                <h3>
-                                    {state.result
-                                        ? 'Game over'
-                                        : yourTurn
-                                            ? 'Tap a tile to discard'
-                                            : 'Waiting…'}
-                                </h3>
-                            </div>
-                            {yourTurn && (
-                                <button
-                                    className="secondary-button"
-                                    type="button"
-                                    onClick={requestHint}
-                                    disabled={locked}
-                                >
-                                    Hint
-                                </button>
-                            )}
+                    <div className="solo-table">
+                        <div className="seat-slot seat-top">
+                            <SeatPanel
+                                player={seatOf('west')}
+                                active={!state.result && state.current_seat === 'west'}
+                            />
                         </div>
 
-                        {hint && (
-                            <div className="hint-banner">
-                                <span className="eyebrow">Suggested discard</span>
-                                <div className="meld-row" style={{ flexWrap: 'wrap' }}>
-                                    {(hint.optimal_discards || [hint.discard]).map((tile, i) => (
-                                        <TileCard key={`hint-${tile.code}-${i}`} tile={tile} size="sm" />
-                                    ))}
+                        <div className="seat-slot seat-left">
+                            <SeatPanel
+                                player={seatOf('north')}
+                                active={!state.result && state.current_seat === 'north'}
+                            />
+                        </div>
+
+                        <div className="table-center">
+                            <WallBar
+                                live={state.live_wall_count}
+                                dead={Math.max(0, state.wall_count - state.live_wall_count)}
+                            />
+                            <div className="discard-board">
+                                <div className="dboard-cell d-top">{renderSeatDiscards('west')}</div>
+                                <div className="dboard-cell d-left">{renderSeatDiscards('north')}</div>
+                                <div className="dboard-mid">
+                                    <span className="center-status">
+                                        {revealedDiscards.length} discards
+                                        {revealing ? ' · playing…' : ''}
+                                    </span>
                                 </div>
-                                {(hint.optimal_discards?.length || 1) > 1 && (
-                                    <p style={{ margin: 0, color: '#666', fontSize: '0.85rem' }}>
-                                        Any of these is an equally strong discard.
-                                    </p>
-                                )}
+                                <div className="dboard-cell d-right">{renderSeatDiscards('south')}</div>
+                                <div className="dboard-cell d-bottom">{renderSeatDiscards('east')}</div>
                             </div>
-                        )}
-
-                        <MeldRow melds={human?.melds} />
-
-                        <div className="picker-grid" style={{ marginTop: human?.melds?.length ? 12 : 0 }}>
-                            {handTiles.map(({ tile, isDrawn }, i) => {
-                                const isHinted = yourTurn && hintKeys.has(`${tile.suit}-${tile.value}`)
-                                return (
-                                <button
-                                    key={`${tile.code}-${i}`}
-                                    className={`tile picker-tile tile-${tile.suit}${isHinted ? ' hint-tile' : ''}${isDrawn ? ' drawn-tile' : ''}`}
-                                    type="button"
-                                    onClick={() => discard(tile)}
-                                    disabled={!yourTurn || locked}
-                                    title={isDrawn ? `${tile.label} (just drawn)` : tile.label}
-                                >
-                                    <TileFace tile={tile} />
-                                </button>
-                                )
-                            })}
                         </div>
 
-                        {kongable.length > 0 && yourTurn && (
-                            <div className="helper-actions">
-                                <p className="eyebrow">Declare concealed Kong</p>
-                                <div className="meld-row">
-                                    {kongable.map((tile, i) => (
+                        <div className="seat-slot seat-right">
+                            <SeatPanel
+                                player={seatOf('south')}
+                                active={!state.result && state.current_seat === 'south'}
+                            />
+                        </div>
+
+                        <div className="seat-slot seat-bottom">
+                            {state.awaiting_claim && state.claim && !revealing && (
+                                <ClaimPrompt
+                                    claim={state.claim}
+                                    onClaim={claim}
+                                    onPass={passClaim}
+                                    disabled={isBusy}
+                                />
+                            )}
+
+                            <section className="seat-panel seat-human">
+                                <div className="panel-heading">
+                                    <div>
+                                        <p className="eyebrow">You · East{human ? ` · ${human.tile_count} tiles` : ''}</p>
+                                        <h3>
+                                            {state.result
+                                                ? 'Game over'
+                                                : yourTurn
+                                                    ? 'Tap a tile to discard'
+                                                    : 'Waiting…'}
+                                        </h3>
+                                    </div>
+                                    {yourTurn && (
                                         <button
-                                            key={`kong-${tile.code}-${i}`}
                                             className="secondary-button"
                                             type="button"
-                                            onClick={() => declareKong(tile)}
+                                            onClick={requestHint}
                                             disabled={locked}
                                         >
-                                            Kong {tile.label}
+                                            Hint
                                         </button>
-                                    ))}
+                                    )}
                                 </div>
-                            </div>
-                        )}
 
-                        {human?.bonus_tiles?.length > 0 && (
-                            <div className="bonus-section">
-                                <p className="eyebrow">Your bonus tiles ({human.bonus_tiles.length})</p>
-                                <div className="meld-row">
-                                    {human.bonus_tiles.map((tile, i) => (
-                                        <TileCard key={`${tile.code}-${i}`} tile={tile} size="sm" />
-                                    ))}
+                                {hint && (
+                                    <div className="hint-banner">
+                                        <span className="eyebrow">Suggested discard</span>
+                                        <div className="meld-row" style={{ flexWrap: 'wrap' }}>
+                                            {(hint.optimal_discards || [hint.discard]).map((tile, i) => (
+                                                <TileCard key={`hint-${tile.code}-${i}`} tile={tile} size="sm" />
+                                            ))}
+                                        </div>
+                                        {(hint.optimal_discards?.length || 1) > 1 && (
+                                            <p style={{ margin: 0, color: '#666', fontSize: '0.85rem' }}>
+                                                Any of these is an equally strong discard.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <MeldRow melds={human?.melds} />
+
+                                <div className="picker-grid" style={{ marginTop: human?.melds?.length ? 12 : 0 }}>
+                                    {handTiles.map(({ tile, isDrawn }, i) => {
+                                        const isHinted = yourTurn && hintKeys.has(`${tile.suit}-${tile.value}`)
+                                        return (
+                                            <button
+                                                key={`${tile.code}-${i}`}
+                                                className={`tile picker-tile tile-${tile.suit}${isHinted ? ' hint-tile' : ''}${isDrawn ? ' drawn-tile' : ''}`}
+                                                type="button"
+                                                onClick={() => discard(tile)}
+                                                disabled={!yourTurn || locked}
+                                                title={isDrawn ? `${tile.label} (just drawn)` : tile.label}
+                                            >
+                                                <TileFace tile={tile} />
+                                            </button>
+                                        )
+                                    })}
                                 </div>
-                            </div>
-                        )}
-                    </section>
 
-                    <section className="tile-picker-panel" style={{ marginTop: 24 }}>
+                                {kongable.length > 0 && yourTurn && (
+                                    <div className="helper-actions">
+                                        <p className="eyebrow">Declare concealed Kong</p>
+                                        <div className="meld-row">
+                                            {kongable.map((tile, i) => (
+                                                <button
+                                                    key={`kong-${tile.code}-${i}`}
+                                                    className="secondary-button"
+                                                    type="button"
+                                                    onClick={() => declareKong(tile)}
+                                                    disabled={locked}
+                                                >
+                                                    Kong {tile.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {human?.bonus_tiles?.length > 0 && (
+                                    <div className="bonus-section">
+                                        <p className="eyebrow">Your bonus tiles ({human.bonus_tiles.length})</p>
+                                        <div className="meld-row">
+                                            {human.bonus_tiles.map((tile, i) => (
+                                                <TileCard key={`${tile.code}-${i}`} tile={tile} size="sm" />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+                    </div>
+
+                    <section className="tile-picker-panel solo-log">
                         <p className="eyebrow">Game log</p>
                         {revealing ? (
                             <p style={{ margin: 0, color: '#888' }}>Opponents are playing…</p>
