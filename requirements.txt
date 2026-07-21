@@ -11,6 +11,9 @@ curl_cffi==0.11.4
 cycler==0.12.1
 Django==6.0.5
 django-cors-headers==4.9.0
+dj-database-url==2.3.0
+gunicorn==23.0.0
+whitenoise==6.9.0
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 Flask==3.1.1

@@ -64,15 +64,19 @@ function Home() {
                     <h2>Build Mahjong understanding one decision at a time.</h2>
                     <p>
                         Learn the rules, test your discards, and play full rounds against
-                        the computer — every feature is powered by the same Mahjong engine,
-                        so the advice you learn from is the same logic you play against.
+                        the computer — every feature is powered by the same Mahjong engine.
                     </p>
                 </div>
             </section>
 
+            <p className="feature-guide">
+                New here? Work through the features in order.
+            </p>
+
             <section className="feature-grid" aria-label="Features">
-                {FEATURES.map((feature) => (
+                {FEATURES.map((feature, index) => (
                     <Link key={feature.to} to={feature.to} className="feature-card">
+                        <span className="feature-step" aria-label={`Step ${index + 1}`}>{index + 1}</span>
                         <span className="feature-glyph" aria-hidden="true">{feature.glyph}</span>
                         <h3>{feature.title}</h3>
                         <p>{feature.body}</p>

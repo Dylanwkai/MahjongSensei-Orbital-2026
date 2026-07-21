@@ -1,7 +1,12 @@
 import axios from 'axios'
 
+// Backend base URL. In production this is set via REACT_APP_API_URL at build
+// time (Render env var); locally it falls back to the Django dev server.
+export const API_BASE_URL =
+    process.env.REACT_APP_API_URL || 'http://localhost:8000'
+
 const api = axios.create({
-    baseURL: 'http://localhost:8000',
+    baseURL: API_BASE_URL,
 })
 
 // automatically attach token to every request
@@ -23,7 +28,7 @@ function refreshAccessToken() {
     // Share one in-flight refresh between concurrent 401s.
     if (!refreshPromise) {
         refreshPromise = axios
-            .post('http://localhost:8000/api/token/refresh/', {
+            .post(`${API_BASE_URL}/api/token/refresh/`, {
                 refresh: localStorage.getItem('refresh_token'),
             })
             .then((response) => {

@@ -17,3 +17,4 @@ frontend/build/
 htmlcov/
 
 milestone1-proof.png
+.DS_Store
