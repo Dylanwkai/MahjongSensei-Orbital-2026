@@ -1,0 +1,35 @@
+name: Cleanup expired JWT tokens
+
+# Purges expired rows from SimpleJWT's OutstandingToken / BlacklistedToken
+# tables so the token_blacklist tables don't grow unbounded over time.
+# Runs weekly on GitHub's servers (independent of Render's free-tier sleep).
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'   # every Sunday at 03:00 UTC
+  workflow_dispatch: {}    # allows manual runs from the Actions tab
+
+jobs:
+  flush-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Flush expired tokens
+        env:
+          # Neon connection string, stored as a GitHub repository secret.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # DEBUG=True keeps the CLI run simple (no SSL-redirect config needed).
+          DEBUG: 'True'
+          # SECRET_KEY is required for Django to start; value is irrelevant here.
+          SECRET_KEY: 'ci-token-cleanup-not-a-real-secret'
+        run: python backend/manage.py flushexpiredtokens
