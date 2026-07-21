@@ -1544,3 +1544,289 @@ button.tile:focus-visible {
   margin-left: 20px;
   box-shadow: 0 0 0 2px #ffffff, 0 0 6px 1px rgba(255, 255, 255, 0.7);
 }
+
+/* ============================================================= */
+/* Solo Play table layout (mobile-friendly: seats around a pool) */
+/* ============================================================= */
+.solo-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.solo-status strong {
+  color: var(--text);
+}
+
+.solo-table {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(155deg, var(--felt), var(--felt-deep));
+  grid-template-columns: 1fr minmax(0, 1.7fr) 1fr;
+  grid-template-areas:
+    "top    top    top"
+    "left   center right"
+    "bottom bottom bottom";
+}
+.seat-top { grid-area: top; }
+.seat-left { grid-area: left; }
+.seat-right { grid-area: right; }
+.seat-bottom { grid-area: bottom; }
+.table-center { grid-area: center; }
+
+.seat-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+  height: 100%;
+}
+.seat-active {
+  box-shadow: 0 0 0 2px var(--gold), var(--shadow);
+}
+.seat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.seat-wind {
+  text-transform: capitalize;
+  font-weight: 700;
+  color: var(--accent-dark);
+  font-size: 0.8rem;
+}
+.seat-head strong { font-size: 0.95rem; }
+.seat-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.seat-bonus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.hand-backs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.tile-back {
+  width: 22px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--felt-line);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--felt-deep),
+    var(--felt-deep) 3px,
+    var(--felt) 3px,
+    var(--felt) 6px
+  );
+}
+
+.table-center {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+.discard-pool { min-height: 60px; }
+.discard-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.solo-muted { color: var(--muted); margin: 6px 0 0; }
+
+.wall-bar { }
+.wall-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.wall-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+.wall-sliver {
+  width: 5px;
+  height: 18px;
+  border-radius: 1px;
+  background: var(--felt);
+}
+.wall-sliver.wall-dead { background: var(--gold); }
+.wall-divider {
+  width: 2px;
+  height: 22px;
+  background: var(--border-strong);
+  margin: 0 5px;
+}
+
+.seat-human { height: auto; }
+
+@media (max-width: 760px) {
+  .solo-table {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "top"
+      "left"
+      "right"
+      "center"
+      "bottom";
+  }
+}
+
+/* ---- Realistic table (desktop): oriented seats + per-seat discards ---- */
+.solo-table {
+  grid-template-columns: minmax(120px, 0.85fr) minmax(0, 2.3fr) minmax(120px, 0.85fr);
+  align-items: stretch;
+}
+
+/* Side seats: hands run as a vertical column of sideways backs. */
+.seat-left .hand-backs,
+.seat-right .hand-backs {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.seat-left .tile-back,
+.seat-right .tile-back {
+  width: 30px;
+  height: 20px;
+}
+.seat-top .hand-backs { justify-content: center; }
+.seat-top .seat-head { justify-content: center; text-align: center; }
+
+/* Centre of the table: each seat's discards laid around a middle marker. */
+.discard-board {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  margin-top: 10px;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas:
+    ".      dtop    ."
+    "dleft  dmid    dright"
+    ".      dbot    .";
+  align-items: center;
+  justify-items: center;
+}
+.d-top { grid-area: dtop; }
+.d-left { grid-area: dleft; }
+.dboard-mid { grid-area: dmid; }
+.d-right { grid-area: dright; }
+.d-bottom { grid-area: dbot; }
+
+.dboard-cell {
+  min-height: 36px;
+  min-width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dboard-cell .discard-tiles {
+  justify-content: center;
+  max-width: 220px;
+}
+.dboard-mid {
+  min-width: 80px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  border: 1px dashed var(--border-strong);
+}
+.center-status {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Mobile: revert to the simple stacked layout. */
+@media (max-width: 760px) {
+  .seat-left .hand-backs,
+  .seat-right .hand-backs {
+    flex-direction: row;
+  }
+  .seat-left .tile-back,
+  .seat-right .tile-back {
+    width: 22px;
+    height: 30px;
+  }
+  .discard-board {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "dtop"
+      "dleft"
+      "dmid"
+      "dright"
+      "dbot";
+  }
+  .dboard-cell:empty { display: none; }
+}
+
+/* ---- Compact Solo Play so the whole board + hand fit one screen ---- */
+.solo-header { padding-bottom: 12px; }
+.solo-header h2 { margin: 2px 0 0; }
+
+.solo-status { margin-top: 8px; }
+
+.solo-table {
+  margin-top: 8px;
+  gap: 8px;
+  padding: 10px;
+}
+
+/* Smaller face-up tiles inside the table (discards, melds, bonus, claim). */
+.solo-table .tile-sm { width: 34px; }
+
+/* Smaller hand tiles so 14 fit without eating vertical space. */
+.seat-human .picker-grid .tile { width: 44px; }
+
+.seat-panel { padding: 8px 10px; }
+
+/* Smaller face-down backs. */
+.tile-back { width: 18px; height: 26px; }
+.seat-left .tile-back,
+.seat-right .tile-back { width: 26px; height: 17px; }
+
+.wall-sliver { height: 14px; }
+.wall-bar .wall-labels { margin-bottom: 3px; }
+
+.discard-board { margin-top: 6px; gap: 6px; }
+.dboard-cell { min-height: 28px; min-width: 30px; }
+.dboard-mid { padding: 5px 8px; }
+
+/* Keep the game log from pushing the hand off-screen. */
+.solo-log { margin-top: 10px; }
+.solo-log .game-log {
+  max-height: 58px;
+  overflow-y: auto;
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  /* On mobile a single column already scrolls, so restore comfortable sizes. */
+  .seat-human .picker-grid .tile { width: 50px; }
+  .solo-table .tile-sm { width: 38px; }
+}
