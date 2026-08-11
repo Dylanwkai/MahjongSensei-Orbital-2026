@@ -235,7 +235,7 @@ h1, h2, h3 {
 }
 
 /* ==========================================================================
-   Auth pages — the front door sits on the felt
+   Auth pages - the front door sits on the felt
    ========================================================================== */
 
 .auth-page {
@@ -670,7 +670,7 @@ a.feature-card:hover {
 }
 
 /* ==========================================================================
-   Tiles — the heart of the UI
+   Tiles - the heart of the UI
    --------------------------------------------------------------------------
    .tile is used both as a read-only <div> (TileCard) and as interactive
    <button>s (pickers). The face art comes from TileFace (SVG); the tile
@@ -900,7 +900,7 @@ button.tile:focus-visible {
 }
 
 /* ==========================================================================
-   Panels — plain and felt
+   Panels - plain and felt
    ========================================================================== */
 
 .demo-layout {

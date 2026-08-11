@@ -1,13 +1,6 @@
-// Mahjong tile rendering for the whole app.
-//
-// Every tile face is drawn as inline SVG — no image assets — so tiles stay
-// crisp at any size and can be themed from CSS. Two things are exported:
-//
-//   TileFace  — just the face art (corner index + SVG). Use it INSIDE your own
-//               <button className="tile ..."> when the tile is interactive.
-//   TileCard  — a complete read-only tile (a styled <div> wrapping TileFace).
-//
-// A tile object is { suit, value, code, label }, matching the Django engine.
+// Mahjong tile rendering. Tile faces are inline SVG (no image assets).
+// Exports TileFace (art only, for use inside your own interactive button) and
+// TileCard (a read-only styled tile). A tile is { suit, value, code, label }.
 
 const SUIT_CODE = {
     bamboo: 'B',
@@ -27,9 +20,7 @@ export function makeTile(suit, value) {
     return { suit, value, code: `${prefix}${value}`, label }
 }
 
-/* ------------------------------------------------------------------ */
-/* palette + shared bits                                               */
-/* ------------------------------------------------------------------ */
+// palette + shared bits
 
 const INK = '#22304a'      // wind characters, outlines
 const RED = '#c02c2c'      // characters suit, red dragon, red flowers
@@ -60,9 +51,7 @@ function Stick({ x, y, h, color }) {
     )
 }
 
-/* ------------------------------------------------------------------ */
-/* circles (dots) 1-9                                                 */
-/* ------------------------------------------------------------------ */
+// circles (dots) 1-9
 
 const DOT_LAYOUTS = {
     1: { r: 15, points: [[30, 38]] },
@@ -93,9 +82,7 @@ function CirclesFace({ value }) {
     )
 }
 
-/* ------------------------------------------------------------------ */
-/* bamboo 1-9 (1 is the traditional bird)                             */
-/* ------------------------------------------------------------------ */
+// bamboo 1-9 (1 is the traditional bird)
 
 const STICK_LAYOUTS = {
     2: { h: 26, points: [[30, 18]], red: [], bottom: [[30, 56]] },
@@ -166,9 +153,7 @@ function BambooFace({ value }) {
     )
 }
 
-/* ------------------------------------------------------------------ */
-/* characters (wan) 1-9                                               */
-/* ------------------------------------------------------------------ */
+// characters (wan) 1-9
 
 const CN_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九']
 
@@ -181,9 +166,7 @@ function CharactersFace({ value }) {
     )
 }
 
-/* ------------------------------------------------------------------ */
-/* honours: winds + dragons                                           */
-/* ------------------------------------------------------------------ */
+// honours: winds + dragons
 
 const WIND_CHARS = { east: '東', south: '南', west: '西', north: '北' }
 
@@ -221,9 +204,7 @@ function HonourFace({ value }) {
     )
 }
 
-/* ------------------------------------------------------------------ */
-/* bonus: flowers + animals                                           */
-/* ------------------------------------------------------------------ */
+// bonus: flowers + animals
 
 // A five-petal blossom, tinted red or blue to match the flower set.
 function FlowerFace({ value }) {
@@ -312,9 +293,7 @@ const ANIMAL_FACES = {
     chicken: ChickenFace,
 }
 
-/* ------------------------------------------------------------------ */
-/* corner index — the beginner-friendly hint                          */
-/* ------------------------------------------------------------------ */
+// corner index - the beginner-friendly hint
 
 const WIND_INDEX = { east: 'E', south: 'S', west: 'W', north: 'N' }
 const DRAGON_INDEX = { red: 'R', green: 'G', white: 'W' }
@@ -336,9 +315,7 @@ function cornerIndex(tile) {
     return null // animals carry their name on the face instead
 }
 
-/* ------------------------------------------------------------------ */
-/* public components                                                  */
-/* ------------------------------------------------------------------ */
+// public components
 
 function faceFor(tile) {
     switch (tile.suit) {

@@ -66,7 +66,7 @@ function HistoryEntry({ attempt }) {
             <div className="history-entry-foot">
                 <div className="history-pick">
                     <span className="eyebrow">Your discard</span>
-                    {attempt.your_discard ? <TileCard tile={attempt.your_discard} size="sm" /> : <span>—</span>}
+                    {attempt.your_discard ? <TileCard tile={attempt.your_discard} size="sm" /> : <span>-</span>}
                 </div>
                 <div className="history-pick">
                     <span className="eyebrow">
@@ -76,7 +76,7 @@ function HistoryEntry({ attempt }) {
                         const optimal = attempt.optimal_discards
                             || (attempt.correct_discard ? [attempt.correct_discard] : [])
                         if (optimal.length === 0) {
-                            return <span>—</span>
+                            return <span>-</span>
                         }
                         return (
                             <div className="meld-row" style={{ flexWrap: 'wrap' }}>

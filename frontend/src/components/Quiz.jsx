@@ -80,7 +80,7 @@ function Quiz({ questions, onComplete, isSubmitting }) {
                     <p>
                         {selected === question.answer
                             ? 'Correct!'
-                            : `Not quite — the answer is "${question.options[question.answer]}".`}
+                            : `Not quite - the answer is "${question.options[question.answer]}".`}
                     </p>
                     <button className="primary-button" type="button" onClick={next}>
                         {isLast ? 'Finish quiz' : 'Next question'}

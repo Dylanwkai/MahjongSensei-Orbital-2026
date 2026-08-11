@@ -250,10 +250,10 @@ function HandHelper() {
 
                     {winResult?.is_winning && (
                         <section className="win-banner" aria-label="Winning hand">
-                            <p className="eyebrow">🎉 Winning hand!</p>
+                            <p className="eyebrow">Winning hand!</p>
                             <h3>{winResult.description}</h3>
                             <p>
-                                This hand is already complete — no discard needed. You can
+                                This hand is already complete - no discard needed. You can
                                 still ask for a recommendation below to explore alternatives.
                             </p>
                         </section>

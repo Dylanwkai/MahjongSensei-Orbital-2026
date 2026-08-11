@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 
-# Hardcoded catalog of tutorial modules. These do not need their own table —
+# Hardcoded catalog of tutorial modules. These do not need their own table -
 # the module definitions are static content, and per-user completion is tracked
 # by TutorialProgress rows keyed on module_id.
 TUTORIAL_MODULES = [

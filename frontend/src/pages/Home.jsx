@@ -64,7 +64,7 @@ function Home() {
                     <h2>Build Mahjong understanding one decision at a time.</h2>
                     <p>
                         Learn the rules, test your discards, and play full rounds against
-                        the computer — every feature is powered by the same Mahjong engine.
+                        the computer - every feature is powered by the same Mahjong engine.
                     </p>
                 </div>
             </section>
@@ -109,7 +109,7 @@ function Home() {
                     <h2>Deal a practice hand</h2>
                     <p>
                         Not sure where to start? Deal yourself a random hand and study its
-                        shape — then take it to the Hand Helper to see what the engine
+                        shape - then take it to the Hand Helper to see what the engine
                         would keep.
                     </p>
                     <button className="primary-button" onClick={generateHand} disabled={isLoading}>

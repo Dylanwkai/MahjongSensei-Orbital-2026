@@ -156,7 +156,7 @@ function WinSummary({ win }) {
                 <div>
                     <p className="eyebrow">Round over</p>
                     <h3 style={{ textTransform: 'capitalize' }}>
-                        {win.winner_name} wins by {(win.win_type || '').replace('_', ' ')} — {win.total_tai} tai
+                        {win.winner_name} wins by {(win.win_type || '').replace('_', ' ')} - {win.total_tai} tai
                     </h3>
                     <p style={{ color: '#666' }}>
                         {win.pattern_label}

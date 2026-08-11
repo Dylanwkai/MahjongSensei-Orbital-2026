@@ -1,11 +1,7 @@
-"""Solo Play game logic.
+"""Solo Play: a 4 player game with one human (East) and three AI opponents.
 
-Runs a 4 player game with one human (East by default) and three AI opponents.
-Handles dealing, the draw/discard turns, AI moves, flowers, concealed Kongs,
-self-drawn wins, claiming Pong/Kong/Chow off a discard, winning on a discard
-(Ron), scoring the win in tai, and the washout draw.
-
-No Django imports here so it can be tested on its own.
+Covers dealing, the draw/discard loop, claims, Ron, scoring, and the washout.
+No Django imports so it can be tested on its own.
 """
 
 from collections import Counter

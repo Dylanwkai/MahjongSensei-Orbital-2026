@@ -350,7 +350,7 @@ class TrainerSubmitView(APIView):
 
         optimal_labels = [tile["label"] for tile in optimal_discards]
         if is_correct:
-            feedback = "Nice — that's an optimal discard."
+            feedback = "Nice - that's an optimal discard."
         elif len(optimal_labels) == 1:
             feedback = (
                 f"Not quite. The optimal discard is {optimal_labels[0]}. "

@@ -66,12 +66,8 @@ class Tile:
 
 
 class Meld:
-    """A Pong, Kong or Chow.
-
-    claimed=True means the meld was made by taking another player's discard, so
-    it is shown face up and its tiles are fixed. claimed=False is a meld formed
-    from your own hand (like a concealed Kong), which stays hidden.
-    """
+    """A Pong, Kong or Chow. claimed=True means it was taken from a discard
+    (face up); claimed=False is formed from your own hand (e.g. concealed Kong)."""
 
     def __init__(self, kind, tiles, claimed=False):
         self.kind = kind          # pong, kong or chow
@@ -388,13 +384,8 @@ class HandGenerator:
 
 class HandEvaluator:
     def evaluate_hand(self, tiles):
-        """
-        Return a rough hand strength score.
-
-        This is a first-pass evaluator for discard recommendations. It rewards
-        complete sets, pairs, and useful near-sequences, while subtracting for
-        isolated tiles.
-        """
+        """Rough hand strength: reward complete sets, pairs, and near-sequences,
+        penalise isolated tiles."""
         playable_tiles = [tile for tile in tiles if not tile.is_bonus]
         counts = Counter((tile.suit, tile.value) for tile in playable_tiles)
 
@@ -531,13 +522,10 @@ PATTERN_LABELS = {
 
 
 class WinChecker:
-    """Checks whether a hand is a complete winning hand.
-
-    Handles three shapes: standard (four sets plus a pair), seven pairs, and
-    thirteen orphans. Bonus tiles are ignored. A hand is normally 14 tiles, but
-    each Kong adds one, so a standard hand can be 14 to 18 tiles. For a standard
-    win the result also includes the pair and melds so the scorer can use them.
-    """
+    """Checks for a complete winning hand: standard (four sets + pair), seven
+    pairs, or thirteen orphans. Bonus tiles ignored; each Kong adds a tile, so a
+    standard hand is 14 to 18 tiles. A standard result also returns pair + melds
+    for the scorer."""
 
     def check(self, tiles):
         playable = [tile for tile in tiles if not tile.is_bonus]
@@ -718,13 +706,8 @@ class ScoreCalculator:
         self.scoring = scoring or SCORING
 
     def score(self, win_result, bonus_tiles=None, win_type=None, winning_tile=None):
-        """Score a winning hand.
-
-        win_type ('self_draw' / 'ron') and winning_tile are optional context used
-        only by Pinghu: a Pinghu may be scored on a self-draw, or on a discard
-        (Ron) only when the hand had a two-sided wait (two or more tiles could
-        have completed it). Without this context Pinghu is not awarded.
-        """
+        """Score a winning hand. win_type and winning_tile are optional context
+        used only by Pinghu (needs a self-draw or a two-sided Ron wait)."""
         bonus_tiles = bonus_tiles or []
 
         if not win_result.get("is_winning"):

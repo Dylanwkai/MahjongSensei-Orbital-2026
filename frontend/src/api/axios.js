@@ -34,7 +34,7 @@ function refreshAccessToken() {
             .then((response) => {
                 localStorage.setItem('access_token', response.data.access)
                 // With ROTATE_REFRESH_TOKENS the backend also returns a new
-                // refresh token and blacklists the old one — store it or the
+                // refresh token and blacklists the old one - store it or the
                 // NEXT refresh would fail with a blacklisted token.
                 if (response.data.refresh) {
                     localStorage.setItem('refresh_token', response.data.refresh)

@@ -76,7 +76,7 @@ const LESSON_CONTENT = {
     melds: {
         lessons: [
             {
-                title: 'Pong — three identical tiles',
+                title: 'Pong - three identical tiles',
                 meld: {
                     name: 'Pong',
                     tiles: [makeTile('circles', 5), makeTile('circles', 5), makeTile('circles', 5)],
@@ -84,7 +84,7 @@ const LESSON_CONTENT = {
                 },
             },
             {
-                title: 'Kong — four identical tiles',
+                title: 'Kong - four identical tiles',
                 meld: {
                     name: 'Kong',
                     tiles: [
@@ -97,7 +97,7 @@ const LESSON_CONTENT = {
                 },
             },
             {
-                title: 'Chow — a run of three',
+                title: 'Chow - a run of three',
                 meld: {
                     name: 'Chow',
                     tiles: [makeTile('bamboo', 3), makeTile('bamboo', 4), makeTile('bamboo', 5)],
@@ -138,7 +138,7 @@ const LESSON_CONTENT = {
             {
                 title: 'The shape of a winning hand',
                 body:
-                    'A standard winning hand is four melds (Pongs, Kongs, or Chows) plus one pair — the "eyes". That is 14 tiles when you draw the winning tile.',
+                    'A standard winning hand is four melds (Pongs, Kongs, or Chows) plus one pair - the "eyes". That is 14 tiles when you draw the winning tile.',
             },
             {
                 title: 'A worked example',
@@ -197,7 +197,7 @@ const LESSON_CONTENT = {
             {
                 title: 'Winds and dragons',
                 body:
-                    'A Pong or Kong of a dragon (Red, Green, or White) scores 1 tai each. A Pong of your seat wind scores 1 tai, and a Pong of the round (prevailing) wind scores 1 tai — so if you are East in the East round, a Pong of East counts twice, for 2 tai. A single pair of winds or dragons scores nothing; you need the triplet.',
+                    'A Pong or Kong of a dragon (Red, Green, or White) scores 1 tai each. A Pong of your seat wind scores 1 tai, and a Pong of the round (prevailing) wind scores 1 tai - so if you are East in the East round, a Pong of East counts twice, for 2 tai. A single pair of winds or dragons scores nothing; you need the triplet.',
                 groups: [
                     [makeTile('honour', 'red'), makeTile('honour', 'red'), makeTile('honour', 'red')],
                     [makeTile('honour', 'east'), makeTile('honour', 'east'), makeTile('honour', 'east')],
@@ -206,7 +206,7 @@ const LESSON_CONTENT = {
             {
                 title: 'Flushes and all pongs',
                 body:
-                    'A Half Flush — one suit plus honours — scores 2 tai. A Full Flush — one suit and no honours at all — scores 4 tai. All Pongs, a hand whose four sets are all Pongs or Kongs (no Chow), scores 2 tai. These stack with your wind and dragon tai.',
+                    'A Half Flush - one suit plus honours - scores 2 tai. A Full Flush - one suit and no honours at all - scores 4 tai. All Pongs, a hand whose four sets are all Pongs or Kongs (no Chow), scores 2 tai. These stack with your wind and dragon tai.',
                 groups: [
                     [makeTile('circles', 2), makeTile('circles', 3), makeTile('circles', 4)],
                     [makeTile('circles', 6), makeTile('circles', 7), makeTile('circles', 8)],
@@ -217,7 +217,7 @@ const LESSON_CONTENT = {
             {
                 title: 'Pinghu',
                 body:
-                    'Pinghu is a hand of four Chows plus a pair with no flowers or animals — it scores 4 tai. If the same shape has any flower or animal it becomes a Smelly Pinghu, worth just 1 tai. Pinghu only counts on a self-draw, or on a discard where you were waiting on two possible tiles (for example holding 3-4 and able to win on 2 or 5).',
+                    'Pinghu is a hand of four Chows plus a pair with no flowers or animals - it scores 4 tai. If the same shape has any flower or animal it becomes a Smelly Pinghu, worth just 1 tai. Pinghu only counts on a self-draw, or on a discard where you were waiting on two possible tiles (for example holding 3-4 and able to win on 2 or 5).',
                 groups: [
                     [makeTile('bamboo', 1), makeTile('bamboo', 2), makeTile('bamboo', 3)],
                     [makeTile('bamboo', 4), makeTile('bamboo', 5), makeTile('bamboo', 6)],
@@ -229,7 +229,7 @@ const LESSON_CONTENT = {
             {
                 title: 'Special hands: Seven Pairs and Thirteen Orphans',
                 body:
-                    'Some hands break the usual four-melds-plus-a-pair shape. Seven Pairs — seven different pairs — scores 2 tai. Thirteen Orphans — one of every terminal (1 and 9 of each suit) and every honour, with one of them paired — is a hard, prized hand worth 5 tai.',
+                    'Some hands break the usual four-melds-plus-a-pair shape. Seven Pairs - seven different pairs - scores 2 tai. Thirteen Orphans - one of every terminal (1 and 9 of each suit) and every honour, with one of them paired - is a hard, prized hand worth 5 tai.',
                 tiles: [
                     makeTile('bamboo', 1), makeTile('bamboo', 9),
                     makeTile('circles', 1), makeTile('circles', 9),
@@ -243,7 +243,7 @@ const LESSON_CONTENT = {
             {
                 title: 'Flowers and animals',
                 body:
-                    'Bonus tiles score too. Each seat owns one flower number — East is 1, South is 2, West is 3, North is 4 — and holding your seat flower scores 1 tai. Every animal tile (cat, mouse, centipede, chicken) scores 1 tai. Flowers and animals count toward the 1-tai minimum, so a hand can win on its bonus tiles alone.',
+                    'Bonus tiles score too. Each seat owns one flower number - East is 1, South is 2, West is 3, North is 4 - and holding your seat flower scores 1 tai. Every animal tile (cat, mouse, centipede, chicken) scores 1 tai. Flowers and animals count toward the 1-tai minimum, so a hand can win on its bonus tiles alone.',
                 tiles: [
                     makeTile('flower', 'red_1'),
                     makeTile('animal', 'cat'),
@@ -515,7 +515,7 @@ function Tutorial() {
                                     type="button"
                                     onClick={backToList}
                                 >
-                                    Done — back to modules
+                                    Done - back to modules
                                 </button>
                             </div>
                         )}

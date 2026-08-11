@@ -179,7 +179,7 @@ FRONTEND_ORIGINS = [o.strip() for o in os.getenv(
 CORS_ALLOWED_ORIGINS = FRONTEND_ORIGINS
 CSRF_TRUSTED_ORIGINS = FRONTEND_ORIGINS
 
-# Production hardening — only switches on when DEBUG is off.
+# Production hardening - only switches on when DEBUG is off.
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
