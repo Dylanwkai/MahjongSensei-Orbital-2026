@@ -1,10 +1,4 @@
-/* ==========================================================================
-   MahjongSensei design system
-   --------------------------------------------------------------------------
-   Direction: clean modern app chrome on warm ivory, with deep felt-green
-   "table" surfaces wherever playable tiles live. Tiles are ivory with a
-   subtle 3D edge, like real Mahjong tiles sitting on the felt.
-   ========================================================================== */
+/* MahjongSensei design system */
 
 :root {
   /* surfaces */
@@ -92,9 +86,7 @@ h1, h2, h3 {
   }
 }
 
-/* ==========================================================================
-   Brand / logo
-   ========================================================================== */
+/* Brand / logo */
 
 .logo-mark {
   align-items: center;
@@ -137,9 +129,7 @@ h1, h2, h3 {
   text-transform: uppercase;
 }
 
-/* ==========================================================================
-   App shell + navigation
-   ========================================================================== */
+/* App shell + navigation */
 
 .app-shell {
   min-height: 100vh;
@@ -234,9 +224,7 @@ h1, h2, h3 {
   justify-content: center;
 }
 
-/* ==========================================================================
-   Auth pages - the front door sits on the felt
-   ========================================================================== */
+/* Auth pages - the front door sits on the felt */
 
 .auth-page {
   align-items: center;
@@ -327,9 +315,7 @@ h1, h2, h3 {
   text-align: center;
 }
 
-/* ==========================================================================
-   Shared bits
-   ========================================================================== */
+/* Shared bits */
 
 .eyebrow {
   color: var(--muted);
@@ -390,9 +376,7 @@ h1, h2, h3 {
   transform: translateY(0) scale(0.98);
 }
 
-/* ==========================================================================
-   Page headers, cards, grids
-   ========================================================================== */
+/* Page headers, cards, grids */
 
 .dashboard-hero,
 .profile-header {
@@ -519,7 +503,7 @@ h1, h2, h3 {
   text-align: center;
 }
 
-/* Home feature cards -------------------------------------------------- */
+/* Home feature cards */
 
 .feature-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -597,7 +581,7 @@ a.feature-card:hover {
   margin-top: 14px;
 }
 
-/* Profile / stats ------------------------------------------------------ */
+/* Profile / stats */
 
 .roadmap-section,
 .profile-header,
@@ -669,13 +653,7 @@ a.feature-card:hover {
   margin-top: 6px;
 }
 
-/* ==========================================================================
-   Tiles - the heart of the UI
-   --------------------------------------------------------------------------
-   .tile is used both as a read-only <div> (TileCard) and as interactive
-   <button>s (pickers). The face art comes from TileFace (SVG); the tile
-   body, edge and depth are all CSS here.
-   ========================================================================== */
+/* Tiles - the heart of the UI */
 
 .tile {
   align-items: center;
@@ -732,7 +710,7 @@ a.feature-card:hover {
   width: 76px;
 }
 
-/* interactive tiles ---------------------------------------------------- */
+/* interactive tiles */
 
 button.tile {
   transition: transform 0.14s ease, box-shadow 0.14s ease;
@@ -792,7 +770,7 @@ button.tile:focus-visible {
   top: 4px;
 }
 
-/* tile rows + grids ---------------------------------------------------- */
+/* tile rows + grids */
 
 .tile-grid,
 .picker-grid,
@@ -837,7 +815,7 @@ button.tile:focus-visible {
 .picker-grid > .tile:nth-child(17), .tile-grid .tile:nth-child(17) { animation-delay: 0.5s; }
 .picker-grid > .tile:nth-child(18), .tile-grid .tile:nth-child(18) { animation-delay: 0.53s; }
 
-/* melds ----------------------------------------------------------------- */
+/* melds */
 
 .meld-row {
   align-items: flex-start;
@@ -899,9 +877,7 @@ button.tile:focus-visible {
   margin-bottom: 10px;
 }
 
-/* ==========================================================================
-   Panels - plain and felt
-   ========================================================================== */
+/* Panels - plain and felt */
 
 .demo-layout {
   display: grid;
@@ -997,9 +973,7 @@ button.tile:focus-visible {
   background: rgba(255, 253, 248, 0.2);
 }
 
-/* ==========================================================================
-   Hand Helper / Trainer layouts
-   ========================================================================== */
+/* Hand Helper / Trainer layouts */
 
 .helper-layout {
   display: grid;
@@ -1080,7 +1054,7 @@ button.tile:focus-visible {
   margin: 0;
 }
 
-/* difficulty toggle ----------------------------------------------------- */
+/* difficulty toggle */
 
 .difficulty-toggle {
   background: var(--panel-soft);
@@ -1129,7 +1103,7 @@ button.tile:focus-visible {
   color: #2b2620;
 }
 
-/* trainer history -------------------------------------------------------- */
+/* trainer history */
 
 .history-list {
   display: flex;
@@ -1211,9 +1185,7 @@ button.tile:focus-visible {
   text-align: right;
 }
 
-/* ==========================================================================
-   Solo Play
-   ========================================================================== */
+/* Solo Play */
 
 .solo-opponents {
   display: grid;
@@ -1283,9 +1255,7 @@ button.tile:focus-visible {
   padding-left: 18px;
 }
 
-/* ==========================================================================
-   Tutorial + quiz
-   ========================================================================== */
+/* Tutorial + quiz */
 
 .module-card-head {
   align-items: center;
@@ -1438,9 +1408,7 @@ button.tile:focus-visible {
   margin-top: 16px;
 }
 
-/* ==========================================================================
-   Animations
-   ========================================================================== */
+/* Animations */
 
 @keyframes deal-in {
   from {
@@ -1500,9 +1468,7 @@ button.tile:focus-visible {
   75% { transform: translateX(5px); }
 }
 
-/* ==========================================================================
-   Responsive
-   ========================================================================== */
+/* Responsive */
 
 @media (max-width: 960px) {
   .feature-grid {
@@ -1568,9 +1534,7 @@ button.tile:focus-visible {
   box-shadow: 0 0 0 2px #ffffff, 0 0 6px 1px rgba(255, 255, 255, 0.7);
 }
 
-/* ============================================================= */
 /* Solo Play table layout (mobile-friendly: seats around a pool) */
-/* ============================================================= */
 .solo-status {
   display: flex;
   flex-wrap: wrap;
@@ -1720,7 +1684,7 @@ button.tile:focus-visible {
   }
 }
 
-/* ---- Realistic table (desktop): oriented seats + per-seat discards ---- */
+/* Realistic table (desktop): oriented seats + per-seat discards */
 .solo-table {
   grid-template-columns: minmax(120px, 0.85fr) minmax(0, 2.3fr) minmax(120px, 0.85fr);
   align-items: stretch;
@@ -1808,7 +1772,7 @@ button.tile:focus-visible {
   .dboard-cell:empty { display: none; }
 }
 
-/* ---- Compact Solo Play so the whole board + hand fit one screen ---- */
+/* Compact Solo Play so the whole board + hand fit one screen */
 .solo-header { padding-bottom: 12px; }
 .solo-header h2 { margin: 2px 0 0; }
 
