@@ -159,7 +159,9 @@ class SoloGame:
         return self.play_until_human()
 
     def human_declare_kong(self, suit, value):
-        """Human action: declare a concealed Kong on your turn, then redraw."""
+        """Human action on your turn, then redraw: either declare a concealed
+        Kong (four matching tiles in hand) or upgrade an exposed Pong to a Kong
+        with the fourth tile you have just drawn."""
         if self.result is not None:
             raise ValueError("The game is over.")
         player = self._current()
@@ -167,8 +169,17 @@ class SoloGame:
             raise ValueError("You can only declare a Kong on your turn.")
         if len(self.deck) < 2:
             raise ValueError("Not enough tiles left to Kong.")
-        player.hand.declare_kong(suit, value, self.deck)
-        self._log(f"{player.name} declared a concealed Kong of {value}.")
+
+        concealed = sum(
+            1 for t in player.hand.tiles if t.suit == suit and t.value == value
+        )
+        if concealed >= 4:
+            player.hand.declare_kong(suit, value, self.deck)
+            self._log(f"{player.name} declared a concealed Kong of {value}.")
+        else:
+            player.hand.promote_pong_to_kong(suit, value, self.deck)
+            self._log(f"{player.name} added the fourth tile to their Pong of {value} for a Kong.")
+
         if self._is_valid_win(player):
             self._declare_win(self.current_index, "self_draw", None)
         return self

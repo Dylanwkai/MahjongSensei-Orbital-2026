@@ -187,6 +187,38 @@ class Hand:
 
         return self._draw_replacement(deck)
 
+    def promote_pong_to_kong(self, suit, value, deck=None):
+        """Add a fourth tile drawn into hand to an exposed Pong, upgrading it to
+        a Kong, then draw a replacement. Returns the replacement tile, or None if
+        no deck is given."""
+        meld = next(
+            (
+                m for m in self.melds
+                if m.kind == "pong"
+                and m.tiles
+                and m.tiles[0].suit == suit
+                and m.tiles[0].value == value
+            ),
+            None,
+        )
+        if meld is None:
+            raise ValueError("You do not have an exposed Pong of that tile to upgrade.")
+
+        fourth = next(
+            (t for t in self.tiles if t.suit == suit and t.value == value), None
+        )
+        if fourth is None:
+            raise ValueError("You need the fourth matching tile in hand to upgrade the Pong.")
+
+        self.tiles.remove(fourth)
+        meld.tiles.append(fourth)
+        meld.kind = "kong"
+
+        if deck is None:
+            return None
+
+        return self._draw_replacement(deck)
+
     def add_tile(self, tile):
         if tile.is_bonus:
             self.bonus_tiles.append(tile)

@@ -69,15 +69,16 @@ function HandBacks({ count }) {
 
 // One AI seat: name + tile count, their face-up melds and bonus tiles, and their
 // concealed hand shown as tile backs.
-function SeatPanel({ player, active, banker, claimsToShow }) {
+function SeatPanel({ player, active, banker, claimsToShow, winner }) {
     if (!player) {
         return null
     }
     return (
-        <article className={`seat-panel${active ? ' seat-active' : ''}${banker ? ' seat-banker' : ''}`}>
+        <article className={`seat-panel${active ? ' seat-active' : ''}${banker ? ' seat-banker' : ''}${winner ? ' seat-winner' : ''}`}>
             <div className="seat-head">
                 <span className="seat-wind">{player.seat_wind}</span>
                 <strong>{player.name}</strong>
+                {winner && <span className="winner-chip">Winner</span>}
                 {banker && <span className="banker-chip">Banker</span>}
                 <span className="seat-count">{player.tile_count} tiles</span>
             </div>
@@ -523,6 +524,19 @@ function SoloPlay() {
         return Object.values(counts).filter((entry) => entry.n === 4).map((e) => e.tile)
     }, [human])
 
+    // Exposed Pongs the human can upgrade to a Kong because they hold (just
+    // drew) the fourth matching tile.
+    const promotableKongs = useMemo(() => {
+        if (!human?.melds || !human?.tiles) {
+            return []
+        }
+        const held = new Set(human.tiles.map((t) => `${t.suit}-${t.value}`))
+        return human.melds
+            .filter((meld) => meld.kind === 'pong' && meld.claimed && meld.tiles?.length)
+            .map((meld) => meld.tiles[0])
+            .filter((tile) => held.has(`${tile.suit}-${tile.value}`))
+    }, [human])
+
     // Tiles the hint suggests discarding, for highlighting in the hand.
     const hintKeys = useMemo(() => {
         const list = hint?.optimal_discards || (hint?.discard ? [hint.discard] : [])
@@ -547,6 +561,10 @@ function SoloPlay() {
     }
     const yourTurn = state && state.is_human_turn && !state.result && !revealing
     const locked = isBusy || revealing
+
+    // Once the reveal finishes, mark the winning seat on the board.
+    const gameOver = Boolean(state && state.result && !revealing)
+    const wonBy = (wind) => gameOver && state.result === 'win' && state.winner_seat === wind
 
     // The tile just drawn onto the human's turn. It is hidden until the AI
     // discards have all been revealed, then shown with a highlight.
@@ -671,6 +689,7 @@ function SoloPlay() {
                                 active={!state.result && state.current_seat === 'west'}
                                 banker={state.dealer === 'west'}
                                 claimsToShow={claimsShownBySeat.west}
+                                winner={wonBy('west')}
                             />
                         </div>
 
@@ -680,6 +699,7 @@ function SoloPlay() {
                                 active={!state.result && state.current_seat === 'north'}
                                 banker={state.dealer === 'north'}
                                 claimsToShow={claimsShownBySeat.north}
+                                winner={wonBy('north')}
                             />
                         </div>
 
@@ -699,6 +719,30 @@ function SoloPlay() {
                                 </div>
                                 <div className="dboard-cell d-right">{renderSeatDiscards('south')}</div>
                                 <div className="dboard-cell d-bottom">{renderSeatDiscards('east')}</div>
+
+                                {gameOver && (
+                                    <div className={`win-overlay${state.result === 'washout' ? ' win-overlay-draw' : ''}`}>
+                                        {state.result === 'win' ? (
+                                            <>
+                                                <span className="win-overlay-icon">🏆</span>
+                                                <span className="win-overlay-title">
+                                                    {wonBy('east') ? 'You win!' : `${cap(state.winner_seat)} wins`}
+                                                </span>
+                                                {state.win && (
+                                                    <span className="win-overlay-sub">
+                                                        {(state.win.win_type || '').replace('_', ' ')} · {state.win.total_tai} tai
+                                                    </span>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="win-overlay-icon">🀄</span>
+                                                <span className="win-overlay-title">Washout</span>
+                                                <span className="win-overlay-sub">No winner this hand</span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -708,6 +752,7 @@ function SoloPlay() {
                                 active={!state.result && state.current_seat === 'south'}
                                 banker={state.dealer === 'south'}
                                 claimsToShow={claimsShownBySeat.south}
+                                winner={wonBy('south')}
                             />
                         </div>
 
@@ -721,11 +766,12 @@ function SoloPlay() {
                                 />
                             )}
 
-                            <section className={`seat-panel seat-human${state.dealer === 'east' ? ' seat-banker' : ''}`}>
+                            <section className={`seat-panel seat-human${state.dealer === 'east' ? ' seat-banker' : ''}${wonBy('east') ? ' seat-winner' : ''}`}>
                                 <div className="panel-heading">
                                     <div>
                                         <p className="eyebrow">
                                             You · East{human ? ` · ${human.tile_count} tiles` : ''}
+                                            {wonBy('east') && <span className="winner-chip">Winner</span>}
                                             {state.dealer === 'east' && <span className="banker-chip">Banker</span>}
                                         </p>
                                         <h3>
@@ -797,6 +843,25 @@ function SoloPlay() {
                                                     disabled={locked}
                                                 >
                                                     Kong {tile.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {promotableKongs.length > 0 && yourTurn && (
+                                    <div className="helper-actions">
+                                        <p className="eyebrow">Upgrade Pong to Kong</p>
+                                        <div className="meld-row">
+                                            {promotableKongs.map((tile, i) => (
+                                                <button
+                                                    key={`promo-${tile.code}-${i}`}
+                                                    className="secondary-button"
+                                                    type="button"
+                                                    onClick={() => declareKong(tile)}
+                                                    disabled={locked}
+                                                >
+                                                    Kong {tile.label} (add to Pong)
                                                 </button>
                                             ))}
                                         </div>
