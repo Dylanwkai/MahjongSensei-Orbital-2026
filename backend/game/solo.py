@@ -35,7 +35,8 @@ MELD_STRENGTH = 9
 
 class Player:
     def __init__(self, seat_wind, is_human=False, name=None):
-        self.seat_wind = seat_wind
+        self.seat_wind = seat_wind        # fixed table position (never changes)
+        self.wind = seat_wind             # scoring wind; rotates with the banker
         self.is_human = is_human
         self.name = name or seat_wind.capitalize()
         self.hand = Hand([])
@@ -50,6 +51,7 @@ class Player:
     def to_dict(self, reveal=False):
         return {
             "seat_wind": self.seat_wind,
+            "wind": self.wind,
             "name": self.name,
             "is_human": self.is_human,
             "melds": [meld.to_dict() for meld in self.hand.melds],
@@ -76,6 +78,21 @@ class SoloGame:
         self.deck = Deck()
         self.dealer_index = dealer_index  # which seat deals (the banker)
         self.current_index = dealer_index
+
+        # The banker is always East; the other seats take South/West/North going
+        # round from the banker. So each seat's scoring wind rotates with the
+        # deal while its table position stays put.
+        for i, player in enumerate(self.players):
+            player.wind = SEAT_WINDS[(i - dealer_index) % 4]
+
+        # Name the seats Player / AI 1-3 (anticlockwise from the human).
+        ai_number = 0
+        for player in self.players:
+            if player.is_human:
+                player.name = "Player"
+            else:
+                ai_number += 1
+                player.name = f"AI {ai_number}"
         self.discards = []  # list of [seat_index, Tile, claim]; claim is None
         # until the tile is claimed, then {"by": index, "as": action}.
         self.last_discard = None
@@ -493,7 +510,7 @@ class SoloGame:
         win_result = WinChecker().check(player.all_tiles())
         if not win_result["is_winning"]:
             return False
-        score = ScoreCalculator(player.seat_wind, self.round_wind).score(
+        score = ScoreCalculator(player.wind, self.round_wind).score(
             win_result, player.hand.bonus_tiles, win_type="self_draw"
         )
         return score["is_valid_win"]
@@ -506,7 +523,7 @@ class SoloGame:
         win_result = WinChecker().check(combined)
         if not win_result["is_winning"]:
             return False
-        score = ScoreCalculator(player.seat_wind, self.round_wind).score(
+        score = ScoreCalculator(player.wind, self.round_wind).score(
             win_result,
             player.hand.bonus_tiles,
             win_type="ron",
@@ -532,7 +549,7 @@ class SoloGame:
 
         winner = self.players[index]
         win_result = WinChecker().check(winner.all_tiles())
-        score = ScoreCalculator(winner.seat_wind, self.round_wind).score(
+        score = ScoreCalculator(winner.wind, self.round_wind).score(
             win_result,
             winner.hand.bonus_tiles,
             win_type=win_type,
@@ -563,6 +580,7 @@ class SoloGame:
         return {
             "tile": pending["tile"].to_dict(),
             "from_seat": self.players[pending["discarder"]].seat_wind,
+            "from_name": self.players[pending["discarder"]].name,
             "actions": options["actions"],
             "chow_options": options["chow_runs"],
         }
@@ -607,6 +625,12 @@ class SoloGame:
             "phase": self.phase,
             "result": self.result,
             "current_seat": self.players[self.current_index].seat_wind,
+            "current_name": self.players[self.current_index].name,
+            "winner_name": (
+                self.players[self.winner_index].name
+                if self.winner_index is not None
+                else None
+            ),
             "is_human_turn": (
                 self._current().is_human and not game_over and self.phase == "discard"
             ),

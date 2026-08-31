@@ -820,7 +820,7 @@ class SoloGameTests(TestCase):
         game.current_index = 1
         discard = Tile("circles", 3)
         game.last_discard = discard
-        game.discards.append((1, discard))
+        game.discards.append([1, discard, None])
         game._open_claims()
 
         self.assertEqual(game.phase, "claim")
@@ -840,7 +840,7 @@ class SoloGameTests(TestCase):
         game.players[0].hand.tiles = self._filler_13_with(*tiles("C", 4, "C", 5))
         game.current_index = 3
         game.last_discard = discard
-        game.discards.append((3, discard))
+        game.discards.append([3, discard, None])
         game._open_claims()
         self.assertEqual(game.phase, "claim")
         self.assertIn("chow", game.pending_claim["options"]["actions"])
@@ -855,7 +855,7 @@ class SoloGameTests(TestCase):
         game2.players[0].hand.tiles = self._filler_13_with(*tiles("C", 4, "C", 5))
         game2.current_index = 1
         game2.last_discard = discard
-        game2.discards.append((1, discard))
+        game2.discards.append([1, discard, None])
         game2._open_claims()
         # No claim was possible, so the turn simply advanced.
         self.assertNotEqual(game2.phase, "claim")
@@ -868,7 +868,7 @@ class SoloGameTests(TestCase):
         game.current_index = 1
         discard = Tile("honour", "green")
         game.last_discard = discard
-        game.discards.append((1, discard))
+        game.discards.append([1, discard, None])
         game._open_claims()
 
         self.assertNotEqual(game.phase, "claim")   # AI resolves without the human
@@ -888,7 +888,7 @@ class SoloGameTests(TestCase):
         game.current_index = 1  # South discards the winning East
         discard = Tile("honour", "east")
         game.last_discard = discard
-        game.discards.append((1, discard))
+        game.discards.append([1, discard, None])
         game._open_claims()
 
         self.assertEqual(game.phase, "claim")
@@ -1196,3 +1196,157 @@ class ScoreHandApiTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
+
+
+class SeatWindRotationTests(TestCase):
+    """The banker is always East and every seat's scoring wind rotates with the
+    deal, while its table position (and the Player / AI 1-3 names) stay put."""
+
+    def test_banker_is_east_and_seat_winds_rotate(self):
+        for dealer in range(4):
+            game = SoloGame(human_seat="east", dealer_index=dealer)
+
+            # Each seat's scoring wind is offset from its position by the dealer.
+            self.assertEqual(
+                [p.wind for p in game.players],
+                [SEAT_WINDS[(i - dealer) % 4] for i in range(4)],
+            )
+            # Whoever deals holds the East wind.
+            self.assertEqual(game.players[dealer].wind, "east")
+            # Table positions never move, whoever the banker is.
+            self.assertEqual([p.seat_wind for p in game.players], list(SEAT_WINDS))
+
+    def test_worked_example_when_ai_one_deals(self):
+        # AI 1 (the seat after the human) deals: the human becomes North, AI 1
+        # East, AI 2 South, AI 3 West.
+        game = SoloGame(human_seat="east", dealer_index=1)
+        winds = {p.name: p.wind for p in game.players}
+
+        self.assertEqual(winds["AI 1"], "east")
+        self.assertEqual(winds["AI 2"], "south")
+        self.assertEqual(winds["AI 3"], "west")
+        self.assertEqual(winds["Player"], "north")
+
+    def test_players_are_named_player_and_ai_one_to_three(self):
+        game = SoloGame(human_seat="east")
+
+        self.assertEqual([p.name for p in game.players], ["Player", "AI 1", "AI 2", "AI 3"])
+        self.assertEqual(game.players[game.human_index()].name, "Player")
+
+    def test_scoring_uses_the_rotated_seat_wind(self):
+        # AI 1 deals, so the human's scoring wind is North even though they sit
+        # at the East table position.
+        game = SoloGame(human_seat="east", round_wind="east", dealer_index=1)
+        human = game.players[game.human_index()]
+        self.assertEqual(human.wind, "north")
+
+        # A North pong scores the seat wind (North), not the East round wind.
+        human.hand.tiles = tiles(
+            "H", "north", "H", "north", "H", "north",
+            "B", 2, "B", 3, "B", 4,
+            "C", 4, "C", 5, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "C", 9, "C", 9,
+        )
+        game._declare_win(game.human_index(), "self_draw", Tile("honour", "north"))
+
+        labels = [row["label"] for row in game.win_score["breakdown"]]
+        self.assertTrue(any("Seat wind" in l and "north" in l for l in labels))
+        self.assertEqual(game.win_score["hand_tai"], 1)  # north seat wind only
+
+    def test_seat_flower_follows_the_rotated_wind(self):
+        # The human's rotated wind is North; North's flower is number 4, so the
+        # #4 flower scores for them while the East (#1) flower does not.
+        wind = SoloGame(human_seat="east", dealer_index=1).players[0].wind
+        self.assertEqual(wind, "north")
+
+        win = WinChecker().check(tiles(
+            "B", 1, "B", 2, "B", 3,
+            "B", 4, "B", 5, "B", 6,
+            "C", 1, "C", 2, "C", 3,
+            "C", 4, "C", 5, "C", 6,
+            "K", 5, "K", 5,
+        ))
+        calc = ScoreCalculator(wind, "east")
+        north_flower = Tile("flower", "red_4", is_bonus=True)
+        east_flower = Tile("flower", "red_1", is_bonus=True)
+
+        self.assertEqual(
+            calc.score(win, [north_flower], win_type="self_draw")["bonus_tai"], 1
+        )
+        self.assertEqual(
+            calc.score(win, [east_flower], win_type="self_draw")["bonus_tai"], 0
+        )
+
+
+class WinnerSourceTests(TestCase):
+    """The winning summary reports who threw the winning tile (Ron) or that it
+    was self-drawn."""
+
+    def _ready_hand(self):
+        # 234B, 666C, 789K, East pair, Red pair -> waiting on a third East.
+        return tiles(
+            "B", 2, "B", 3, "B", 4,
+            "C", 6, "C", 6, "C", 6,
+            "K", 7, "K", 8, "K", 9,
+            "H", "east", "H", "east",
+            "H", "red", "H", "red",
+        )
+
+    def test_ron_records_the_discarder(self):
+        game = SoloGame(human_seat="east", round_wind="east")
+        game.players[0].hand.tiles = self._ready_hand()
+
+        game.current_index = 1  # AI 1 (South position) throws the winning East
+        discard = Tile("honour", "east")
+        game.last_discard = discard
+        game.discards.append([1, discard, None])
+        game._open_claims()
+        game.human_claim("win")
+
+        win = game._win_public()
+        self.assertEqual(game.win_type, "ron")
+        self.assertEqual(win["from_seat"], "south")  # thrower's table position
+        self.assertEqual(win["from_name"], "AI 1")
+
+    def test_self_draw_has_no_discarder(self):
+        game = SoloGame(human_seat="east", round_wind="east")
+        game.players[0].hand.tiles = self._ready_hand() + tiles("H", "east")
+        game._declare_win(0, "self_draw", Tile("honour", "east"))
+
+        win = game._win_public()
+        self.assertEqual(game.win_type, "self_draw")
+        self.assertIsNone(win["from_seat"])
+        self.assertIsNone(win["from_name"])
+
+
+class PromotePongToKongTests(TestCase):
+    """Upgrading an exposed Pong to a Kong with a drawn fourth tile."""
+
+    def test_promote_turns_the_pong_into_an_exposed_kong(self):
+        hand = Hand(tiles("C", 5, "C", 5, "B", 1, "B", 2))
+        hand.claim_pong("circles", 5)     # exposed pong (2 in hand + discard)
+        hand.tiles.append(Tile("circles", 5))  # the drawn fourth tile
+        deck = Deck()
+        deck.shuffle()
+
+        replacement = hand.promote_pong_to_kong("circles", 5, deck)
+
+        meld = next(m for m in hand.melds if m.tiles[0].suit == "circles")
+        self.assertEqual(meld.kind, "kong")
+        self.assertTrue(meld.claimed)
+        self.assertEqual(len(meld.tiles), 4)
+        self.assertIsNotNone(replacement)
+        # The fourth tile left the concealed hand.
+        self.assertFalse(any(t.suit == "circles" and t.value == 5 for t in hand.tiles))
+
+    def test_promote_without_the_fourth_tile_raises(self):
+        hand = Hand(tiles("C", 5, "C", 5, "B", 1, "B", 2))
+        hand.claim_pong("circles", 5)
+        with self.assertRaises(ValueError):
+            hand.promote_pong_to_kong("circles", 5, Deck())
+
+    def test_promote_without_an_exposed_pong_raises(self):
+        hand = Hand(tiles("C", 5, "C", 5, "C", 5, "B", 1))
+        with self.assertRaises(ValueError):
+            hand.promote_pong_to_kong("circles", 5, Deck())

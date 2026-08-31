@@ -98,13 +98,13 @@ function SeatPanel({ player, active, banker, claimsToShow, winner }) {
     return (
         <article className={`seat-panel${active ? ' seat-active' : ''}${banker ? ' seat-banker' : ''}${winner ? ' seat-winner' : ''}`}>
             <div className="seat-head">
-                <span className="seat-wind">{player.seat_wind}</span>
                 <strong>{player.name}</strong>
+                <span className="seat-wind">{player.wind}</span>
                 {winner && <span className="winner-chip">Winner</span>}
                 {banker && <span className="banker-chip">Banker</span>}
                 <span className="seat-count">{player.tile_count} tiles</span>
             </div>
-            <TaiTargets seatWind={player.seat_wind} />
+            <TaiTargets seatWind={player.wind} />
             <MeldRow melds={visibleMelds(player.melds, claimsToShow)} />
             {player.bonus_tiles?.length > 0 && (
                 <div className="seat-bonus">
@@ -148,7 +148,7 @@ function ClaimPrompt({ claim, onClaim, onPass, disabled }) {
             <div className="panel-heading">
                 <div>
                     <p className="eyebrow">Claim available</p>
-                    <h3 style={{ textTransform: 'capitalize' }}>{claim.from_seat} discarded {claim.tile.label}</h3>
+                    <h3>{claim.from_name || cap(claim.from_seat)} discarded {claim.tile.label}</h3>
                 </div>
                 <div className="meld-row">
                     <TileCard tile={claim.tile} size="sm" />
@@ -710,10 +710,10 @@ function SoloPlay() {
 
                     <div className="solo-status">
                         <span>Round wind: <strong style={{ textTransform: 'capitalize' }}>{state.round_wind}</strong></span>
-                        <span>Turn: <strong style={{ textTransform: 'capitalize' }}>{state.current_seat}</strong></span>
+                        <span>Turn: <strong>{state.current_name}</strong></span>
                         <span>
                             {state.result
-                                ? (state.result === 'win' ? `${state.winner_seat} wins` : 'Washout draw')
+                                ? (state.result === 'win' ? `${state.winner_name} wins` : 'Washout draw')
                                 : revealing
                                     ? 'Opponents playing…'
                                     : yourTurn
@@ -766,7 +766,7 @@ function SoloPlay() {
                                             <>
                                                 <span className="win-overlay-icon">🏆</span>
                                                 <span className="win-overlay-title">
-                                                    {wonBy('east') ? 'You win!' : `${cap(state.winner_seat)} wins`}
+                                                    {wonBy('east') ? 'You win!' : `${state.winner_name || cap(state.winner_seat)} wins`}
                                                 </span>
                                                 {state.win && (
                                                     <span className="win-overlay-sub">
@@ -810,7 +810,7 @@ function SoloPlay() {
                                 <div className="panel-heading">
                                     <div>
                                         <p className="eyebrow">
-                                            You · East{human ? ` · ${human.tile_count} tiles` : ''}
+                                            You{human ? ` · ${cap(human.wind)} · ${human.tile_count} tiles` : ''}
                                             {wonBy('east') && <span className="winner-chip">Winner</span>}
                                             {state.dealer === 'east' && <span className="banker-chip">Banker</span>}
                                         </p>
@@ -834,7 +834,7 @@ function SoloPlay() {
                                     )}
                                 </div>
 
-                                <TaiTargets seatWind="east" />
+                                <TaiTargets seatWind={human?.wind} />
 
                                 {hint && (
                                     <div className="hint-banner">

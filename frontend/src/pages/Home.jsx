@@ -58,65 +58,66 @@ function Home() {
 
     return (
         <AppLayout>
-            <section className="dashboard-hero">
-                <div>
+            <section className="home-hero">
+                <span className="home-hero-glyph" aria-hidden="true">師</span>
+                <div className="home-hero-content">
                     <p className="eyebrow">Welcome back, {user || 'player'}</p>
-                    <h2>Build Mahjong understanding one decision at a time.</h2>
-                    <p>
-                        Learn the rules, test your discards, and play full rounds against
-                        the computer - every feature is powered by the same Mahjong engine.
+                    <h1 className="home-hero-title">
+                        Build Mahjong understanding, one decision at a time.
+                    </h1>
+                    <p className="home-hero-sub">
+                        Learn the rules, sharpen your discards, and play full rounds against
+                        the computer — every feature runs on the same Mahjong engine.
                     </p>
+                    <div className="home-stats" aria-label="Your record">
+                        <div className="home-stat">
+                            <strong>{profile?.games_played ?? 0}</strong>
+                            <span>Played</span>
+                        </div>
+                        <div className="home-stat">
+                            <strong>{profile?.games_won ?? 0}</strong>
+                            <span>Won</span>
+                        </div>
+                        <div className="home-stat">
+                            <strong>{profile?.win_rate ?? 0}%</strong>
+                            <span>Win rate</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <p className="feature-guide">
-                New here? Work through the features in order.
-            </p>
+            <div className="home-section-head">
+                <h2>Explore</h2>
+                <p>New here? Work through them in order.</p>
+            </div>
 
-            <section className="feature-grid" aria-label="Features">
+            <nav className="feature-flow" aria-label="Features">
                 {FEATURES.map((feature, index) => (
-                    <Link key={feature.to} to={feature.to} className="feature-card">
-                        <span className="feature-step" aria-label={`Step ${index + 1}`}>{index + 1}</span>
+                    <Link key={feature.to} to={feature.to} className="feature-item">
+                        <span className="feature-num">{String(index + 1).padStart(2, '0')}</span>
                         <span className="feature-glyph" aria-hidden="true">{feature.glyph}</span>
-                        <h3>{feature.title}</h3>
-                        <p>{feature.body}</p>
-                        <span className="feature-cta">{feature.cta}</span>
+                        <span className="feature-body">
+                            <h3>{feature.title}</h3>
+                            <p>{feature.body}</p>
+                        </span>
+                        <span className="feature-arrow" aria-hidden="true">→</span>
                     </Link>
                 ))}
-            </section>
-
-            <section className="status-grid" aria-label="Your record" style={{ marginTop: 24 }}>
-                <article className="status-card">
-                    <p className="eyebrow">Games played</p>
-                    <strong>{profile?.games_played ?? 0}</strong>
-                    <span>Solo Play rounds finished</span>
-                </article>
-                <article className="status-card">
-                    <p className="eyebrow">Games won</p>
-                    <strong>{profile?.games_won ?? 0}</strong>
-                    <span>Wins recorded on your profile</span>
-                </article>
-                <article className="status-card">
-                    <p className="eyebrow">Win rate</p>
-                    <strong>{profile?.win_rate ?? 0}%</strong>
-                    <span>Updated after every game</span>
-                </article>
-            </section>
+            </nav>
 
             <section className="demo-layout">
-                <section className="demo-copy">
+                <div className="demo-copy">
                     <p className="eyebrow">Warm up</p>
                     <h2>Deal a practice hand</h2>
                     <p>
                         Not sure where to start? Deal yourself a random hand and study its
-                        shape - then take it to the Hand Helper to see what the engine
-                        would keep.
+                        shape — then take it to the Hand Helper to see what the engine would keep.
                     </p>
                     <button className="primary-button" onClick={generateHand} disabled={isLoading}>
                         {isLoading ? 'Dealing…' : 'Deal a hand'}
                     </button>
                     {error && <p className="error-message">{error}</p>}
-                </section>
+                </div>
 
                 <section className="hand-panel felt-panel" aria-label="Generated Mahjong hand">
                     <div className="panel-heading">
