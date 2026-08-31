@@ -1817,3 +1817,41 @@ button.tile:focus-visible {
   .seat-human .picker-grid .tile { width: 50px; }
   .solo-table .tile-sm { width: 38px; }
 }
+
+/* Solo Play wind and banker tracker */
+.solo-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.wind-tracker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 92px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(155deg, var(--felt), var(--felt-deep));
+  color: var(--felt-text);
+  box-shadow: var(--shadow);
+}
+.wind-tracker-main {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.wind-tracker-sub {
+  margin-top: 3px;
+  font-size: 0.72rem;
+  color: var(--felt-muted);
+  white-space: nowrap;
+}
+.solo-header-buttons {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 620px) {
+  .solo-header-buttons { flex-wrap: wrap; }
+}

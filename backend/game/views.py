@@ -466,7 +466,19 @@ class SoloNewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        game = SoloGame(human_seat="east")
+        # The frontend banker/wind tracker supplies the round wind and which
+        # seat is the banker (dealer). Default to a fresh East round, East deals.
+        round_wind = request.data.get("round_wind", "east")
+        if round_wind not in WINDS:
+            round_wind = "east"
+        try:
+            dealer = int(request.data.get("dealer", 0))
+        except (TypeError, ValueError):
+            dealer = 0
+        if dealer not in range(4):
+            dealer = 0
+
+        game = SoloGame(human_seat="east", round_wind=round_wind, dealer_index=dealer)
         game.start()
         _SOLO_GAMES[request.user.id] = game
         _record_solo_result(request.user, game)  # in the rare instant-end case

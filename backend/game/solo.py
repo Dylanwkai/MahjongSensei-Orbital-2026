@@ -64,16 +64,18 @@ class Player:
 
 
 class SoloGame:
-    def __init__(self, human_seat="east", round_wind="east"):
+    def __init__(self, human_seat="east", round_wind="east", dealer_index=0):
         if human_seat not in SEAT_WINDS:
             raise ValueError("human_seat must be one of east/south/west/north.")
+        if dealer_index not in range(4):
+            raise ValueError("dealer_index must be 0 to 3.")
         self.players = [
             Player(wind, is_human=(wind == human_seat)) for wind in SEAT_WINDS
         ]
         self.round_wind = round_wind
         self.deck = Deck()
-        self.dealer_index = 0  # East deals
-        self.current_index = 0
+        self.dealer_index = dealer_index  # which seat deals (the banker)
+        self.current_index = dealer_index
         self.discards = []  # list of (seat_index, Tile)
         self.last_discard = None
         self.last_drawn = None
@@ -94,7 +96,11 @@ class SoloGame:
                 self._deal_one(player)
         self.current_index = self.dealer_index
         self.phase = "draw"
-        self._log(f"Game started. {self._current().name} is the dealer (East).")
+        dealer = self.players[self.dealer_index]
+        self._log(
+            f"Game started. {dealer.name} is the banker for the "
+            f"{self.round_wind} round."
+        )
         return self.play_until_human()
 
     def _deal_one(self, player):
@@ -568,6 +574,7 @@ class SoloGame:
         game_over = self.result is not None
         return {
             "round_wind": self.round_wind,
+            "dealer": self.players[self.dealer_index].seat_wind,
             "phase": self.phase,
             "result": self.result,
             "current_seat": self.players[self.current_index].seat_wind,

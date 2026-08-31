@@ -209,6 +209,45 @@ function WinSummary({ win }) {
 
 const REVEAL_DELAY = 1000  // ms between each revealed AI discard
 
+// Wind and banker tracker. hand 1-4 within a round maps to the banker seat
+// (east, south, west, north); after four hands the round wind advances. The
+// tracker is persisted in localStorage so it survives a page reload.
+const SEAT_WINDS = ['east', 'south', 'west', 'north']
+const TRACKER_KEY = 'mahjong_solo_tracker'
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+
+function loadTracker() {
+    try {
+        const t = JSON.parse(localStorage.getItem(TRACKER_KEY))
+        if (t && Number.isInteger(t.round) && Number.isInteger(t.hand)
+            && t.round >= 0 && t.round < 4 && t.hand >= 1 && t.hand <= 4) {
+            return t
+        }
+    } catch (e) { /* fall through to default */ }
+    return { round: 0, hand: 1 }
+}
+
+// The banker keeps the deal after a win or a washout; otherwise the deal passes
+// to the next seat, and the round wind advances after the fourth hand.
+function advanceTracker(tracker, finishedState) {
+    if (!finishedState || !finishedState.result) {
+        return tracker
+    }
+    const bankerSeat = SEAT_WINDS[tracker.hand - 1]
+    const bankerWon = finishedState.result === 'win'
+        && finishedState.winner_seat === bankerSeat
+    if (bankerWon || finishedState.result === 'washout') {
+        return tracker
+    }
+    let hand = tracker.hand + 1
+    let round = tracker.round
+    if (hand > 4) {
+        hand = 1
+        round = (round + 1) % 4
+    }
+    return { round, hand }
+}
+
 function SoloPlay() {
     const { refreshProfile } = useAuth()
     const [state, setState] = useState(null)
@@ -218,6 +257,15 @@ function SoloPlay() {
     // True when the human's most recent action ends in a fresh draw, so the
     // newly drawn tile should be held back during the reveal then highlighted.
     const [drawnActive, setDrawnActive] = useState(false)
+
+    // Wind and banker tracker, persisted in localStorage across reloads.
+    const [tracker, setTracker] = useState(loadTracker)
+    const setTrackerPersist = useCallback((next) => {
+        setTracker(next)
+        try {
+            localStorage.setItem(TRACKER_KEY, JSON.stringify(next))
+        } catch (e) { /* storage unavailable, keep in memory only */ }
+    }, [])
 
     // How many discards are currently revealed. When a move produces several AI
     // discards at once, we reveal them one at a time (see commitState).
@@ -279,6 +327,14 @@ function SoloPlay() {
         try {
             const response = await api.get('/api/game/solo/state/')
             commitState(response.data, false)
+            // Sync the tracker to the game actually on the server, so the badge
+            // is right after a reload even if localStorage was cleared.
+            const data = response.data
+            const round = SEAT_WINDS.indexOf(data.round_wind)
+            const hand = SEAT_WINDS.indexOf(data.dealer) + 1
+            if (round >= 0 && hand >= 1) {
+                setTrackerPersist({ round, hand })
+            }
         } catch (err) {
             if (err.response?.status === 404) {
                 setState(null) // no game yet
@@ -286,18 +342,22 @@ function SoloPlay() {
                 setError('Could not load the game.')
             }
         }
-    }, [commitState])
+    }, [commitState, setTrackerPersist])
 
     useEffect(() => {
         loadState()
     }, [loadState])
 
-    const newGame = async () => {
+    const startGameAt = async (next) => {
         setIsBusy(true)
         setError('')
         setDrawnActive(false)
+        setTrackerPersist(next)
         try {
-            const response = await api.post('/api/game/solo/new/')
+            const response = await api.post('/api/game/solo/new/', {
+                round_wind: SEAT_WINDS[next.round],
+                dealer: next.hand - 1,
+            })
             commitState(response.data, false)
         } catch (err) {
             setError('Could not start a new game.')
@@ -305,6 +365,13 @@ function SoloPlay() {
             setIsBusy(false)
         }
     }
+
+    // New game: advance the banker/wind from the game currently on the table
+    // (the banker keeps the deal on a win or washout), then deal the next hand.
+    const newGame = () => startGameAt(advanceTracker(tracker, state))
+
+    // Reset: back to the start of the East round, East as banker.
+    const resetGame = () => startGameAt({ round: 0, hand: 1 })
 
     const discard = async (tile) => {
         setIsBusy(true)
@@ -478,9 +545,23 @@ function SoloPlay() {
                     <p className="eyebrow">Solo Play</p>
                     <h2>Play a round against the computer</h2>
                 </div>
-                <button className="primary-button" type="button" onClick={newGame} disabled={isBusy}>
-                    {state ? 'New game' : 'Start game'}
-                </button>
+                <div className="solo-header-actions">
+                    <div className="wind-tracker" title="Prevailing wind and banker">
+                        <span className="wind-tracker-main">{cap(SEAT_WINDS[tracker.round])} {tracker.hand}</span>
+                        <span className="wind-tracker-sub">
+                            Banker: {cap(SEAT_WINDS[tracker.hand - 1])}
+                            {SEAT_WINDS[tracker.hand - 1] === 'east' ? ' (you)' : ''}
+                        </span>
+                    </div>
+                    <div className="solo-header-buttons">
+                        <button className="primary-button" type="button" onClick={newGame} disabled={isBusy}>
+                            {state ? 'New game' : 'Start game'}
+                        </button>
+                        <button className="secondary-button" type="button" onClick={resetGame} disabled={isBusy}>
+                            Reset
+                        </button>
+                    </div>
+                </div>
             </section>
 
             {error && <p className="error-message" style={{ marginTop: 16 }}>{error}</p>}
