@@ -1,41 +1,51 @@
 /* MahjongSensei design system */
 
 :root {
-  /* surfaces */
-  --bg: #f6f1e7;
-  --panel: #fffdf8;
-  --panel-soft: #f7f2e8;
-  --border: #e3dbc9;
-  --border-strong: #cfc5ac;
+  /* surfaces - warm ivory with a hint of champagne */
+  --bg: #f5ecdb;
+  --panel: #fffdf6;
+  --panel-soft: #f7efdd;
+  --border: #e6d9bd;
+  --border-strong: #d4c092;
 
-  /* felt table */
-  --felt: #10583e;
-  --felt-deep: #0a4130;
-  --felt-line: #0c4a35;
-  --felt-text: #e9f2ea;
-  --felt-muted: #a8c7b2;
+  /* felt table - deep emerald */
+  --felt: #0f7048;
+  --felt-deep: #073d28;
+  --felt-line: #0b5638;
+  --felt-text: #f2ecd8;
+  --felt-muted: #b8d4bf;
 
-  /* ink + accents */
-  --text: #2b2620;
-  --muted: #7c7565;
-  --accent: #1e7a46;
-  --accent-dark: #146035;
-  --accent-soft: #e3efe4;
-  --red: #c02c2c;
-  --gold: #c9a227;
-  --gold-soft: #f5e9c8;
-  --danger: #b42318;
-  --blue: #2b6cb0;
+  /* ink + jewel accents */
+  --text: #201d16;
+  --muted: #837858;
+  --accent: #0f8a54;          /* vibrant jade */
+  --accent-dark: #0a5f3a;
+  --accent-soft: #ddf1e5;
+  --red: #b0143a;             /* ruby */
+  --ruby: #b0143a;
+  --ruby-soft: #f7d9e0;
+  --orchid: #9b2c78;          /* orchid pop */
+  --orchid-soft: #f3ddec;
+  --blue: #1f5fae;            /* sapphire */
+
+  /* gold - the star of the show */
+  --gold: #d4af37;
+  --gold-bright: #eccb63;
+  --gold-deep: #a9801d;
+  --gold-soft: #f6e8c4;
+
+  --danger: #b0143a;
 
   /* shape */
-  --radius: 14px;
-  --radius-sm: 10px;
-  --shadow: 0 1px 2px rgba(43, 38, 32, 0.05), 0 8px 24px -12px rgba(43, 38, 32, 0.18);
-  --shadow-lift: 0 2px 4px rgba(43, 38, 32, 0.08), 0 14px 32px -12px rgba(43, 38, 32, 0.26);
+  --radius: 16px;
+  --radius-sm: 11px;
+  --shadow: 0 1px 2px rgba(30, 24, 10, 0.06), 0 10px 28px -14px rgba(30, 24, 10, 0.28);
+  --shadow-lift: 0 3px 6px rgba(30, 24, 10, 0.10), 0 18px 40px -14px rgba(30, 24, 10, 0.34);
+  --glow-gold: 0 6px 20px -6px rgba(180, 140, 40, 0.55);
 
   /* type */
-  --font-display: 'Fraunces', 'Playfair Display', Georgia, 'Times New Roman', serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-display: 'Poppins', 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-body: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -46,9 +56,14 @@ body {
   margin: 0;
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
-  background: var(--bg);
+  background:
+    radial-gradient(1100px 560px at 100% -12%, rgba(212, 175, 55, 0.14), transparent 60%),
+    radial-gradient(900px 520px at -12% 112%, rgba(155, 44, 120, 0.08), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   line-height: 1.55;
+  letter-spacing: 0.1px;
 }
 
 code {
@@ -318,12 +333,18 @@ h1, h2, h3 {
 /* Shared bits */
 
 .eyebrow {
-  color: var(--muted);
+  color: var(--gold-deep);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.13em;
   margin: 0 0 6px;
   text-transform: uppercase;
+}
+.felt-panel .eyebrow,
+.seat-panel .eyebrow,
+.win-summary .eyebrow,
+.claim-prompt .eyebrow {
+  color: var(--gold-bright);
 }
 
 .error-message {
@@ -338,42 +359,85 @@ h1, h2, h3 {
 
 .primary-button,
 .secondary-button {
+  position: relative;
+  overflow: hidden;
   border-radius: 999px;
+  font-family: var(--font-body);
   font-weight: 600;
-  min-height: 42px;
-  padding: 0 22px;
-  transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease;
+  font-size: 0.92rem;
+  letter-spacing: 0.5px;
+  min-height: 44px;
+  padding: 0 26px;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.18s ease, filter 0.18s ease,
+    background 0.18s ease;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* a diagonal sheen that sweeps across on hover */
+.primary-button::after,
+.secondary-button::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  transform: skewX(-18deg);
+  transition: left 0.55s ease;
+  pointer-events: none;
+}
+
+.primary-button:hover:not(:disabled)::after,
+.secondary-button:hover:not(:disabled)::after {
+  left: 130%;
 }
 
 .primary-button {
-  background: linear-gradient(160deg, #23924f, var(--accent-dark));
-  border: 1px solid var(--accent-dark);
-  box-shadow: 0 2px 8px -2px rgba(20, 96, 53, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #14a565 0%, var(--accent-dark) 80%);
+  border: 1.5px solid var(--gold);
+  box-shadow: var(--glow-gold), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 .primary-button:hover:not(:disabled) {
-  box-shadow: 0 6px 16px -4px rgba(20, 96, 53, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -8px rgba(180, 140, 40, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: saturate(1.08) brightness(1.03);
 }
 
 .primary-button:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.97);
 }
 
 .secondary-button {
   background: var(--panel);
-  border: 1px solid var(--border-strong);
-  color: var(--text);
+  border: 1.5px solid var(--gold);
+  color: var(--accent-dark);
+  box-shadow: 0 1px 2px rgba(30, 24, 10, 0.06);
 }
 
 .secondary-button:hover:not(:disabled) {
-  background: var(--panel-soft);
-  transform: translateY(-1px);
+  background: var(--gold-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -8px rgba(180, 140, 40, 0.45);
 }
 
 .secondary-button:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.97);
 }
 
 /* Page headers, cards, grids */
@@ -1639,6 +1703,43 @@ button.tile:focus-visible {
   gap: 4px;
   margin-top: 6px;
 }
+/* A single discarded tile; when eaten it dims and shows a claimer badge. */
+.discard-item {
+  position: relative;
+  display: inline-flex;
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+.discard-eaten {
+  opacity: 0.5;
+  filter: grayscale(0.55);
+}
+.discard-eaten::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--gold-bright);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(180, 140, 40, 0.25);
+  pointer-events: none;
+}
+.eaten-badge {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--gold-deep);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
 .solo-muted { color: var(--muted); margin: 6px 0 0; }
 
 .wall-bar { }
@@ -1854,4 +1955,41 @@ button.tile:focus-visible {
 }
 @media (max-width: 620px) {
   .solo-header-buttons { flex-wrap: wrap; }
+}
+
+/* Banker (dealer) marker on the table seats */
+.banker-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+}
+.seat-panel.seat-banker {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-soft), var(--shadow);
+}
+
+/* Crazy-Rich-Asians luxe accents */
+.feature-card {
+  border-top: 3px solid var(--gold);
+}
+.feature-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--gold);
+}
+/* headings get the glamorous serif with a touch more presence */
+.dashboard-hero h2,
+.profile-header h2 {
+  letter-spacing: -0.4px;
+}
+/* the wind tracker main number wears the display serif */
+.wind-tracker-main {
+  font-family: var(--font-display);
 }

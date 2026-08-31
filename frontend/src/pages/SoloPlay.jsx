@@ -27,6 +27,30 @@ function MeldRow({ melds }) {
     )
 }
 
+// While claims are still animating, a claimer's open meld should not appear
+// until its discard has been shown as eaten. Given how many of a player's
+// claimed melds should be visible, drop the most recent claimed melds beyond
+// that count (concealed melds are always kept).
+function visibleMelds(melds, claimsToShow) {
+    if (!melds || melds.length === 0) {
+        return melds
+    }
+    const totalClaimed = melds.filter((m) => m.claimed).length
+    let hide = totalClaimed - Math.max(0, claimsToShow || 0)
+    if (hide <= 0) {
+        return melds
+    }
+    const result = []
+    for (let i = melds.length - 1; i >= 0; i--) {
+        if (hide > 0 && melds[i].claimed) {
+            hide -= 1
+            continue
+        }
+        result.unshift(melds[i])
+    }
+    return result
+}
+
 // A single face-down tile (the back). Used for hidden opponent hands and the
 // wall is drawn separately as thin slivers.
 function TileBack() {
@@ -45,18 +69,19 @@ function HandBacks({ count }) {
 
 // One AI seat: name + tile count, their face-up melds and bonus tiles, and their
 // concealed hand shown as tile backs.
-function SeatPanel({ player, active }) {
+function SeatPanel({ player, active, banker, claimsToShow }) {
     if (!player) {
         return null
     }
     return (
-        <article className={`seat-panel${active ? ' seat-active' : ''}`}>
+        <article className={`seat-panel${active ? ' seat-active' : ''}${banker ? ' seat-banker' : ''}`}>
             <div className="seat-head">
                 <span className="seat-wind">{player.seat_wind}</span>
                 <strong>{player.name}</strong>
+                {banker && <span className="banker-chip">Banker</span>}
                 <span className="seat-count">{player.tile_count} tiles</span>
             </div>
-            <MeldRow melds={player.melds} />
+            <MeldRow melds={visibleMelds(player.melds, claimsToShow)} />
             {player.bonus_tiles?.length > 0 && (
                 <div className="seat-bonus">
                     {player.bonus_tiles.map((tile, i) => (
@@ -208,6 +233,19 @@ function WinSummary({ win }) {
 }
 
 const REVEAL_DELAY = 1000  // ms between each revealed AI discard
+const EAT_DELAY = 800      // ms a discard sits on the table before it is eaten
+
+// Indices of the discards that have been claimed by a seat, for marking them
+// eaten on the table.
+function claimedIndices(discards) {
+    const set = new Set()
+    ;(discards || []).forEach((d, i) => {
+        if (d.claimed_as) {
+            set.add(i)
+        }
+    })
+    return set
+}
 
 // Wind and banker tracker. hand 1-4 within a round maps to the banker seat
 // (east, south, west, north); after four hands the round wind advances. The
@@ -273,6 +311,11 @@ function SoloPlay() {
     const revealCountRef = useRef(0)
     const revealTimer = useRef(null)
 
+    // Indices of revealed discards whose "eaten" badge is currently shown. A
+    // claimed tile is first shown as a plain discard, then a beat later marked
+    // eaten, so the claim is easy to follow.
+    const [eatenShown, setEatenShown] = useState(() => new Set())
+
     const setReveal = useCallback((n) => {
         revealCountRef.current = n
         setRevealCount(n)
@@ -298,27 +341,34 @@ function SoloPlay() {
         })
 
         clearRevealTimer()
-        const total = data?.discards?.length || 0
+        const discards = data?.discards || []
+        const total = discards.length
 
         if (!animate || total <= revealCountRef.current) {
             setReveal(total)
+            setEatenShown(claimedIndices(discards))  // all eaten marks at once
             return
         }
 
-        // Show the first new discard (the player's own) immediately, then step
-        // through the rest.
-        setReveal(revealCountRef.current + 1)
-        const tick = () => {
-            if (revealCountRef.current >= total) {
+        // Step through the new discards one at a time. When a tile was claimed,
+        // show it as a plain discard first, pause, then mark it eaten before
+        // moving on, so the claim is easy to follow.
+        const step = (i) => {
+            if (i >= total) {
                 revealTimer.current = null
                 return
             }
-            revealTimer.current = setTimeout(() => {
-                setReveal(revealCountRef.current + 1)
-                tick()
-            }, REVEAL_DELAY)
+            setReveal(i + 1)
+            if (discards[i]?.claimed_as) {
+                revealTimer.current = setTimeout(() => {
+                    setEatenShown((prev) => new Set(prev).add(i))
+                    revealTimer.current = setTimeout(() => step(i + 1), REVEAL_DELAY)
+                }, EAT_DELAY)
+            } else {
+                revealTimer.current = setTimeout(() => step(i + 1), REVEAL_DELAY)
+            }
         }
-        tick()
+        step(revealCountRef.current)
     }, [refreshProfile, clearRevealTimer, setReveal])
 
     useEffect(() => clearRevealTimer, [clearRevealTimer])
@@ -482,7 +532,19 @@ function SoloPlay() {
     // While AI discards are still being revealed one by one, hold back the
     // player's controls, the claim prompt and the win summary.
     const revealing = Boolean(state && revealCount < state.discards.length)
-    const revealedDiscards = state ? state.discards.slice(0, revealCount) : []
+    const revealedDiscards = state
+        ? state.discards.slice(0, revealCount).map((d, i) => ({ ...d, index: i }))
+        : []
+
+    // How many of each seat's claimed melds may be shown so far: one per discard
+    // that seat has claimed and that has been revealed as eaten. This keeps a
+    // claimer's open meld hidden until its discard visibly leaves the table.
+    const claimsShownBySeat = {}
+    for (const d of revealedDiscards) {
+        if (d.claimed_by && eatenShown.has(d.index)) {
+            claimsShownBySeat[d.claimed_by] = (claimsShownBySeat[d.claimed_by] || 0) + 1
+        }
+    }
     const yourTurn = state && state.is_human_turn && !state.result && !revealing
     const locked = isBusy || revealing
 
@@ -523,7 +585,8 @@ function SoloPlay() {
         return rest
     }, [human, drawnKey, revealing])
 
-    // Discards laid in front of each seat, around the centre of the table.
+    // Discards laid in front of each seat, around the centre of the table. A
+    // tile another seat has claimed is dimmed and tagged with who ate it.
     const renderSeatDiscards = (wind) => {
         const items = revealedDiscards.filter((entry) => entry.seat === wind)
         if (items.length === 0) {
@@ -531,9 +594,22 @@ function SoloPlay() {
         }
         return (
             <div className="discard-tiles">
-                {items.map((entry, i) => (
-                    <TileCard key={`${wind}-${entry.tile.code}-${i}`} tile={entry.tile} size="sm" />
-                ))}
+                {items.map((entry, i) => {
+                    const eaten = entry.claimed_as && eatenShown.has(entry.index)
+                    return (
+                        <div
+                            key={`${wind}-${entry.tile.code}-${i}`}
+                            className={`discard-item${eaten ? ' discard-eaten' : ''}`}
+                        >
+                            <TileCard tile={entry.tile} size="sm" />
+                            {eaten && (
+                                <span className="eaten-badge">
+                                    {cap(entry.claimed_as)} · {cap(entry.claimed_by)}
+                                </span>
+                            )}
+                        </div>
+                    )
+                })}
             </div>
         )
     }
@@ -593,6 +669,8 @@ function SoloPlay() {
                             <SeatPanel
                                 player={seatOf('west')}
                                 active={!state.result && state.current_seat === 'west'}
+                                banker={state.dealer === 'west'}
+                                claimsToShow={claimsShownBySeat.west}
                             />
                         </div>
 
@@ -600,6 +678,8 @@ function SoloPlay() {
                             <SeatPanel
                                 player={seatOf('north')}
                                 active={!state.result && state.current_seat === 'north'}
+                                banker={state.dealer === 'north'}
+                                claimsToShow={claimsShownBySeat.north}
                             />
                         </div>
 
@@ -626,6 +706,8 @@ function SoloPlay() {
                             <SeatPanel
                                 player={seatOf('south')}
                                 active={!state.result && state.current_seat === 'south'}
+                                banker={state.dealer === 'south'}
+                                claimsToShow={claimsShownBySeat.south}
                             />
                         </div>
 
@@ -639,10 +721,13 @@ function SoloPlay() {
                                 />
                             )}
 
-                            <section className="seat-panel seat-human">
+                            <section className={`seat-panel seat-human${state.dealer === 'east' ? ' seat-banker' : ''}`}>
                                 <div className="panel-heading">
                                     <div>
-                                        <p className="eyebrow">You · East{human ? ` · ${human.tile_count} tiles` : ''}</p>
+                                        <p className="eyebrow">
+                                            You · East{human ? ` · ${human.tile_count} tiles` : ''}
+                                            {state.dealer === 'east' && <span className="banker-chip">Banker</span>}
+                                        </p>
                                         <h3>
                                             {state.result
                                                 ? 'Game over'
@@ -679,7 +764,7 @@ function SoloPlay() {
                                     </div>
                                 )}
 
-                                <MeldRow melds={human?.melds} />
+                                <MeldRow melds={visibleMelds(human?.melds, claimsShownBySeat.east)} />
 
                                 <div className="picker-grid" style={{ marginTop: human?.melds?.length ? 12 : 0 }}>
                                     {handTiles.map(({ tile, isDrawn }, i) => {

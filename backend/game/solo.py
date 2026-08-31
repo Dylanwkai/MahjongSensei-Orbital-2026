@@ -76,7 +76,8 @@ class SoloGame:
         self.deck = Deck()
         self.dealer_index = dealer_index  # which seat deals (the banker)
         self.current_index = dealer_index
-        self.discards = []  # list of (seat_index, Tile)
+        self.discards = []  # list of [seat_index, Tile, claim]; claim is None
+        # until the tile is claimed, then {"by": index, "as": action}.
         self.last_discard = None
         self.last_drawn = None
         self.phase = "draw"  # 'draw' | 'discard' | 'claim' | 'over'
@@ -244,7 +245,7 @@ class SoloGame:
         player = self._current()
         player.hand.tiles.remove(tile)
         self.last_discard = tile
-        self.discards.append((self.current_index, tile))
+        self.discards.append([self.current_index, tile, None])
         self._log(f"{player.name} discarded {tile.label}.")
         self._open_claims()
 
@@ -409,9 +410,11 @@ class SoloGame:
 
     def _execute_claim(self, index, action, tile, low_value=None):
         suit, value = tile.suit, tile.value
-        # The claimed tile leaves the discard pile and joins the meld / hand.
+        # The claimed tile stays in the discard pile but is tagged with who took
+        # it and how, so the table can show that it was eaten rather than having
+        # it silently vanish.
         if self.discards and self.discards[-1][1] is tile:
-            self.discards.pop()
+            self.discards[-1][2] = {"by": index, "as": action}
         self.pending_claim = None
         player = self.players[index]
 
@@ -595,8 +598,15 @@ class SoloGame:
             "last_discard": self.last_discard.to_dict() if self.last_discard else None,
             "last_drawn": self.last_drawn.to_dict() if self.last_drawn else None,
             "discards": [
-                {"seat": self.players[i].seat_wind, "tile": t.to_dict()}
-                for i, t in self.discards
+                {
+                    "seat": self.players[i].seat_wind,
+                    "tile": t.to_dict(),
+                    "claimed_by": (
+                        self.players[claim["by"]].seat_wind if claim else None
+                    ),
+                    "claimed_as": claim["as"] if claim else None,
+                }
+                for i, t, claim in self.discards
             ],
             "players": [
                 p.to_dict(reveal=p.is_human or game_over) for p in self.players
