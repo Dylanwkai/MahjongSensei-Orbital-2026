@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../api/axios'
 import AppLayout from '../components/AppLayout'
-import TileCard, { TileFace } from '../components/TileCard'
+import TileCard, { TileFace, makeTile } from '../components/TileCard'
 import { useAuth } from '../context/AuthContext'
 
 function MeldRow({ melds }) {
@@ -23,6 +23,28 @@ function MeldRow({ melds }) {
                     <span className="meld-tag">{meld.kind}</span>
                 </div>
             ))}
+        </div>
+    )
+}
+
+// Each seat scores 1 tai for a Pong of its own wind, and for the flower/season
+// carrying its number (East=1, South=2, West=3, North=4).
+const SEAT_TAI_NUMBER = { east: 1, south: 2, west: 3, north: 4 }
+
+// A small hint showing the wind and flower that score tai for a given seat.
+function TaiTargets({ seatWind }) {
+    const n = SEAT_TAI_NUMBER[seatWind]
+    if (!n) {
+        return null
+    }
+    const windTile = makeTile('honour', seatWind)
+    const flowerTile = makeTile('flower', `red_${n}`)
+    const label = `${cap(seatWind)} scores a Pong of the ${cap(seatWind)} wind, and flower/season ${n}`
+    return (
+        <div className="tai-targets" title={label}>
+            <span className="tai-targets-label">Tai</span>
+            <TileCard tile={windTile} size="sm" />
+            <TileCard tile={flowerTile} size="sm" />
         </div>
     )
 }
@@ -82,6 +104,7 @@ function SeatPanel({ player, active, banker, claimsToShow, winner }) {
                 {banker && <span className="banker-chip">Banker</span>}
                 <span className="seat-count">{player.tile_count} tiles</span>
             </div>
+            <TaiTargets seatWind={player.seat_wind} />
             <MeldRow melds={visibleMelds(player.melds, claimsToShow)} />
             {player.bonus_tiles?.length > 0 && (
                 <div className="seat-bonus">
@@ -191,7 +214,19 @@ function WinSummary({ win }) {
                 </div>
             </div>
 
-            <p className="eyebrow" style={{ marginTop: 8 }}>Winning hand</p>
+            <p className="eyebrow" style={{ marginTop: 12 }}>Winning tile</p>
+            <div className="win-source">
+                {win.winning_tile && <TileCard tile={win.winning_tile} size="sm" />}
+                <span className="win-source-text">
+                    {win.win_type === 'ron'
+                        ? win.from_seat
+                            ? <>Thrown by <strong style={{ textTransform: 'capitalize' }}>{win.from_name || cap(win.from_seat)}</strong>{win.from_seat === 'east' ? ' (you)' : ''}</>
+                            : 'Won on a discard'
+                        : 'Self-drawn — no one threw it'}
+                </span>
+            </div>
+
+            <p className="eyebrow" style={{ marginTop: 12 }}>Winning hand</p>
             <MeldRow melds={win.melds} />
             <div className="meld-row" style={{ marginTop: win.melds?.length ? 12 : 0, flexWrap: 'wrap' }}>
                 {win.tiles.map((tile, i) => (
@@ -409,7 +444,12 @@ function SoloPlay() {
                 round_wind: SEAT_WINDS[next.round],
                 dealer: next.hand - 1,
             })
-            commitState(response.data, false)
+            // Start from an empty table, then animate the banker and any AI
+            // seats before us playing their opening discards and claims. (When
+            // we are the banker there are no opening discards, so nothing shows.)
+            setReveal(0)
+            setEatenShown(new Set())
+            commitState(response.data, true)
         } catch (err) {
             setError('Could not start a new game.')
         } finally {
@@ -793,6 +833,8 @@ function SoloPlay() {
                                         </button>
                                     )}
                                 </div>
+
+                                <TaiTargets seatWind="east" />
 
                                 {hint && (
                                     <div className="hint-banner">

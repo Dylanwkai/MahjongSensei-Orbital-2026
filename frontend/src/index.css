@@ -1740,6 +1740,37 @@ button.tile:focus-visible {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   z-index: 2;
 }
+/* Winning-tile source on the win summary. */
+.win-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.win-source-text { color: var(--text); font-size: 0.92rem; }
+
+/* Per-seat hint: the wind and flower that score tai for that player. */
+.tai-targets {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+.tai-targets-label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+}
+.tai-targets .tile {
+  width: 26px;
+  padding: 4px 3px 3px;
+  border-radius: 6px;
+}
+.tai-targets .tile-index { font-size: 7px; left: 3px; top: 3px; }
+.seat-panel:not(.seat-human) .tai-targets-label { color: var(--gold-bright); }
+
 .solo-muted { color: var(--muted); margin: 6px 0 0; }
 
 .wall-bar { }

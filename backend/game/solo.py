@@ -522,6 +522,14 @@ class SoloGame:
         self.phase = "over"
         self.pending_claim = None
 
+        # On a Ron the winning tile is the discard just claimed, so its thrower
+        # is the seat of the last discard. A self-draw has no thrower.
+        self.win_from_index = (
+            self.discards[-1][0]
+            if win_type == "ron" and self.discards
+            else None
+        )
+
         winner = self.players[index]
         win_result = WinChecker().check(winner.all_tiles())
         score = ScoreCalculator(winner.seat_wind, self.round_wind).score(
@@ -566,11 +574,18 @@ class SoloGame:
         winner = self.players[self.winner_index]
         score = self.win_score or {}
         result = self.win_result or {}
+        from_index = getattr(self, "win_from_index", None)
         return {
             "winner_seat": winner.seat_wind,
             "winner_name": winner.name,
             "win_type": self.win_type,
             "winning_tile": self.winning_tile.to_dict() if self.winning_tile else None,
+            "from_seat": (
+                self.players[from_index].seat_wind if from_index is not None else None
+            ),
+            "from_name": (
+                self.players[from_index].name if from_index is not None else None
+            ),
             "pattern": result.get("pattern"),
             "pattern_label": result.get("description"),
             "total_tai": score.get("total_tai", 0),
